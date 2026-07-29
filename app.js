@@ -51,10 +51,10 @@ const legacy2025TotalOverrides = {
 };
 
 const levelRules = [
-  { name: "Explorador SAVA", min: 0, max: 6000 },
-  { name: "Protagonista SAVA", min: 6001, max: 13000 },
-  { name: "Líder SAVA", min: 13001, max: 23000 },
-  { name: "Guardião SAVA", min: 23001, max: Infinity },
+  { name: "Explorador SAVA", min: 0, max: 6000, slug: "explorador" },
+  { name: "Protagonista SAVA", min: 6001, max: 13000, slug: "protagonista" },
+  { name: "Líder SAVA", min: 13001, max: 23000, slug: "lider" },
+  { name: "Guardião SAVA", min: 23001, max: Infinity, slug: "guardiao" },
 ];
 
 const badgeDefinitions = [
@@ -630,15 +630,35 @@ function renderRanking() {
 
   els.rankingBody.innerHTML = filtered
     .map((person, index) => {
+      const pos = index + 1;
       const level = getPersonLevel(person);
+      const cumulative = getCumulativeScore(person);
+      const tierMax = level.max === Infinity ? cumulative || level.min || 1 : level.max;
+      const progressPct = Math.max(
+        0,
+        Math.min(100, Math.round(((cumulative - level.min) / Math.max(1, tierMax - level.min)) * 100))
+      );
+      const rankClass = pos <= 3 ? ` rank-${pos}` : "";
       return `
         <tr>
-          <td><span class="rank-chip">${index + 1}</span></td>
-          <td class="name-cell">${escapeHtml(person.name)}</td>
+          <td><span class="rank-chip${rankClass}">${pos}</span></td>
+          <td class="name-cell">
+            <div class="person-cell">
+              <span class="avatar" aria-hidden="true">${escapeHtml(getInitials(person.name))}</span>
+              <span class="person-name">${escapeHtml(person.name)}</span>
+            </div>
+          </td>
           <td>${escapeHtml(person.category)}</td>
-          <td>${level.name}</td>
+          <td><span class="level-pill level-${level.slug}">${level.name}</span></td>
           <td class="numeric"><strong>${formatNumber(person.score)}</strong></td>
-          <td class="numeric">${formatNumber(getCumulativeScore(person))}</td>
+          <td class="numeric">
+            <div class="level-progress-cell">
+              <span>${formatNumber(cumulative)}</span>
+              <div class="level-progress-track">
+                <div class="level-progress-fill level-${level.slug}" style="width:${progressPct}%"></div>
+              </div>
+            </div>
+          </td>
         </tr>
       `;
     })

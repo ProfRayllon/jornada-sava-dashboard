@@ -14,6 +14,13 @@
   --purple: #7c2ba8;
   --blue: #1e66b2;
   --red: #9d2824;
+  --level-explorador: #5c8a7c;
+  --level-protagonista: #1e66b2;
+  --level-lider: #b99243;
+  --level-guardiao: #7c2ba8;
+  --rank-gold: #e5c07c;
+  --rank-silver: #a9adb4;
+  --rank-bronze: #b87e4f;
   font-family: Inter, "Segoe UI", Arial, sans-serif;
 }
 
@@ -29,6 +36,13 @@
   --gold-strong: #f0cf8e;
   --graphite: #d8d4ca;
   --shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+  --level-explorador: #7fb9a5;
+  --level-protagonista: #5b9ee0;
+  --level-lider: #f0cf8e;
+  --level-guardiao: #c58ce8;
+  --rank-gold: #f0cf8e;
+  --rank-silver: #c3c8d1;
+  --rank-bronze: #d29a68;
 }
 
 * {
@@ -445,7 +459,7 @@ table {
 
 th,
 td {
-  height: 49px;
+  height: 58px;
   padding: 0 9px;
   border-bottom: 1px solid var(--line);
   text-align: left;
@@ -459,9 +473,30 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
+  height: 44px;
   background: var(--surface);
-  color: var(--text);
-  font-size: 0.8rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  border-bottom: 2px solid var(--gold);
+}
+
+tbody tr {
+  transition: background-color 140ms ease;
+}
+
+tbody tr:nth-child(even) {
+  background: var(--surface-soft);
+}
+
+tbody tr:hover {
+  background: color-mix(in srgb, var(--gold) 12%, transparent);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
 }
 
 th:nth-child(1),
@@ -511,17 +546,127 @@ td.name-cell {
 .rank-chip {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
   background: var(--surface-soft);
   color: var(--text);
   font-weight: 900;
+  font-size: 0.86rem;
 }
 
-tr:nth-child(1) .rank-chip {
-  background: var(--gold);
+.rank-chip.rank-1 {
+  background: linear-gradient(155deg, var(--rank-gold), color-mix(in srgb, var(--rank-gold) 55%, #a9782f));
   color: #1c1c1c;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rank-gold) 26%, transparent);
+}
+
+.rank-chip.rank-2 {
+  background: linear-gradient(155deg, var(--rank-silver), color-mix(in srgb, var(--rank-silver) 55%, #6b7078));
+  color: #1c1c1c;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rank-silver) 22%, transparent);
+}
+
+.rank-chip.rank-3 {
+  background: linear-gradient(155deg, var(--rank-bronze), color-mix(in srgb, var(--rank-bronze) 55%, #7a4c28));
+  color: #1c1c1c;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rank-bronze) 22%, transparent);
+}
+
+.person-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.avatar {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--gold) 55%, var(--surface)), var(--surface-soft));
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--gold-strong);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.person-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.level-pill {
+  --level-color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--level-color) 16%, transparent);
+  color: var(--level-color);
+  font-size: 0.74rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.level-pill.level-explorador {
+  --level-color: var(--level-explorador);
+}
+
+.level-pill.level-protagonista {
+  --level-color: var(--level-protagonista);
+}
+
+.level-pill.level-lider {
+  --level-color: var(--level-lider);
+}
+
+.level-pill.level-guardiao {
+  --level-color: var(--level-guardiao);
+}
+
+.level-progress-cell {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
+.level-progress-track {
+  width: 84px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  box-shadow: inset 0 0 0 1px var(--line);
+  overflow: hidden;
+}
+
+.level-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--muted);
+  transition: width 220ms ease;
+}
+
+.level-progress-fill.level-explorador {
+  background: var(--level-explorador);
+}
+
+.level-progress-fill.level-protagonista {
+  background: var(--level-protagonista);
+}
+
+.level-progress-fill.level-lider {
+  background: var(--level-lider);
+}
+
+.level-progress-fill.level-guardiao {
+  background: var(--level-guardiao);
 }
 
 .mini-badges {
