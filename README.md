@@ -44,15 +44,15 @@ Domínio de ferramentas tecnológicas = 500
 Total = 1.500
 ```
 
-Para Advogados Associados, a regra temporária usa pontuação normalizada para fechar a mesma régua de `1.500`, sem alterar o Rank:
+Para Advogados Associados, a regra usa os dois indicadores técnicos na pontuação original. A régua do selo para esse perfil é `1.900`:
 
 ```text
-Conhecimentos jurídicos normalizado = Conhecimentos jurídicos / 950 * 750
-Proatividade estratégica normalizada = Proatividade estratégica / 950 * 750
-Mente Brilhante = soma dos dois
+Conhecimentos jurídicos = 950
+Proatividade estratégica = 950
+Total = 1.900
 ```
 
-Para receber o selo, o advogado precisa atingir `1.500 / 1.500` nessa régua normalizada.
+Para receber o selo, o advogado precisa atingir `1.900 / 1.900`. Essa regra vale apenas para o selo e não altera o Rank.
 
 ### Selo Eu inspiro pessoas!
 

@@ -164,7 +164,7 @@ def get_level(score):
 
 
 def lawyer_bright_score(legal_knowledge, strategic_proactivity):
-    return (to_number(legal_knowledge) / 950 * 750) + (to_number(strategic_proactivity) / 950 * 750)
+    return to_number(legal_knowledge) + to_number(strategic_proactivity)
 
 
 def lawyer_inspire_score(responsibility, collaboration):
@@ -310,7 +310,7 @@ def build_records():
             rec["Selo Sou feliz!"] = "Sim"
         if (
             rec["Categoria"] == "Advogados Associados"
-            and lawyer_bright_score(rec["Conhecimentos jurídicos"], rec["Proatividade estratégica"]) >= 1500
+            and lawyer_bright_score(rec["Conhecimentos jurídicos"], rec["Proatividade estratégica"]) >= 1900
         ) or (
             rec["Categoria"] == "Controladoria e Administrativo"
             and sum(to_number(rec[col]) for col in ADM_FINAL_COLUMNS[:3]) >= 1500

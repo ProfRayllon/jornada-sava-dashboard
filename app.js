@@ -497,7 +497,7 @@ function parseLawyerRow(row, headers, people, highlights) {
   person.brightScore = Math.max(person.brightScore || 0, brightScore);
   const inspireScore = getLawyerInspireScore(responsibility, collaboration);
   person.inspireScore = Math.max(person.inspireScore || 0, inspireScore);
-  person.technicalMax = person.technicalMax || brightScore >= 1500;
+  person.technicalMax = person.technicalMax || brightScore >= 1900;
   person.socialMax = person.socialMax || inspireScore >= 2000;
 
   addHighlight(row, headers, person, highlights);
@@ -1084,7 +1084,7 @@ function addHighlight(row, headers, person, highlights) {
 }
 
 function getLawyerBrightScore(legalKnowledge, proactivity) {
-  return (toNumber(legalKnowledge) / 950) * 750 + (toNumber(proactivity) / 950) * 750;
+  return toNumber(legalKnowledge) + toNumber(proactivity);
 }
 
 function getLawyerInspireScore(responsibility, collaboration) {

@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-07-29T00:28:31",
+  "generatedAt": "2026-07-29T10:38:32",
   "years": {
     "2025": {
       "year": 2025,
       "source": "Tratamneto - base 2025.xlsx",
-      "updatedAt": "2026-07-29T00:28:31",
+      "updatedAt": "2026-07-29T10:38:32",
       "people": [
         {
           "name": "ARTHUR MAIA SUASSUNA",
@@ -166,7 +166,7 @@
             "inspire"
           ],
           "badgeScores": {
-            "bright": 1500,
+            "bright": 1900,
             "inspire": 2000
           },
           "evaluations": 1
@@ -202,7 +202,7 @@
             "inspire"
           ],
           "badgeScores": {
-            "bright": 1500,
+            "bright": 1900,
             "inspire": 2000
           },
           "evaluations": 1
@@ -365,7 +365,7 @@
             "inspire"
           ],
           "badgeScores": {
-            "bright": 1500,
+            "bright": 1900,
             "inspire": 2000
           },
           "evaluations": 1
@@ -730,7 +730,7 @@
     "2026": {
       "year": 2026,
       "source": "Tratamento - base 2026.xlsx",
-      "updatedAt": "2026-07-29T00:28:31",
+      "updatedAt": "2026-07-29T10:38:32",
       "people": [
         {
           "name": "CLAYTON PEREIRA",
@@ -865,7 +865,7 @@
             "inspire"
           ],
           "badgeScores": {
-            "bright": 1500,
+            "bright": 1900,
             "inspire": 2000
           },
           "evaluations": 1
@@ -1013,7 +1013,7 @@
             "bright"
           ],
           "badgeScores": {
-            "bright": 1500
+            "bright": 1900
           },
           "evaluations": 1
         },

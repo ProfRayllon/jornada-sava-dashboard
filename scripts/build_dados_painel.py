@@ -102,7 +102,7 @@ def add_badge(person, badge, score=None):
 
 
 def lawyer_bright_score(legal_knowledge, strategic_proactivity):
-    return (to_number(legal_knowledge) / 950 * 750) + (to_number(strategic_proactivity) / 950 * 750)
+    return to_number(legal_knowledge) + to_number(strategic_proactivity)
 
 
 def lawyer_inspire_score(responsibility, collaboration):
@@ -173,7 +173,7 @@ def process_2025():
             add_badge(person, "happy", attendance)
         if (
             category == "Advogados Associados"
-            and lawyer_bright_score(row.get(adv_cols[2]), row.get(adv_cols[3])) >= 1500
+            and lawyer_bright_score(row.get(adv_cols[2]), row.get(adv_cols[3])) >= 1900
         ) or (
             category != "Advogados Associados" and tech_score >= 1500
         ):
@@ -244,7 +244,7 @@ def process_2026():
             add_badge(person, "happy", person["felicidade"])
         if (
             person["category"] == "Advogados Associados"
-            and lawyer_bright_score(row.get(adv_cols[2]), row.get(adv_cols[3])) >= 1500
+            and lawyer_bright_score(row.get(adv_cols[2]), row.get(adv_cols[3])) >= 1900
         ) or (
             person["category"] == "Controladoria e Administrativo" and person["tecnica"] >= 1500
         ):
