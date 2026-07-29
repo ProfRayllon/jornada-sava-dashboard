@@ -400,19 +400,21 @@ h1 {
 .winner-shine::before {
   content: "";
   position: absolute;
-  top: -50%;
+  top: -60%;
   left: -60%;
-  width: 34%;
-  height: 200%;
+  width: 24%;
+  height: 220%;
   background: linear-gradient(
     100deg,
     transparent,
-    rgba(255, 255, 255, 0.06) 45%,
-    rgba(229, 192, 124, 0.14) 50%,
-    rgba(255, 255, 255, 0.06) 55%,
+    rgba(255, 255, 255, 0.1) 46%,
+    rgba(229, 192, 124, 0.24) 50%,
+    rgba(255, 255, 255, 0.1) 54%,
     transparent
   );
-  transform: rotate(8deg);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.7) 55%, transparent 92%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.7) 55%, transparent 92%);
+  transform: rotate(10deg);
   animation: winner-shine-sweep 7s ease-in-out infinite;
 }
 
