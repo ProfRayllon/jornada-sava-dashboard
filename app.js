@@ -246,13 +246,20 @@ function bindEvents() {
   els.winnerImageInput.addEventListener("change", (event) => {
     const [file] = event.target.files;
     if (!file) return;
+    const yearData = state.years.get(state.activeYear);
+    const winner = yearData?.ranking[0];
+    if (!winner) return;
     const reader = new FileReader();
     reader.onload = () => {
       els.winnerImage.src = reader.result;
-      localStorage.setItem(`jornada-sava-winner-${state.activeYear}`, reader.result);
+      localStorage.setItem(getWinnerPhotoKey(winner.name), reader.result);
     };
     reader.readAsDataURL(file);
   });
+}
+
+function getWinnerPhotoKey(name) {
+  return `jornada-sava-winner-photo-${normalize(name)}`;
 }
 
 function restorePreferences() {
@@ -260,9 +267,6 @@ function restorePreferences() {
   setTheme(theme);
 
   setFiltersHidden(localStorage.getItem("jornada-sava-filters-hidden") === "true");
-
-  const savedImage = localStorage.getItem(`jornada-sava-winner-${state.activeYear}`);
-  if (savedImage) els.winnerImage.src = savedImage;
 }
 
 function setFiltersHidden(hidden) {
@@ -656,9 +660,6 @@ function buildCumulativeTotals() {
 
 function render() {
   const yearData = state.years.get(state.activeYear);
-  const savedImage = localStorage.getItem(`jornada-sava-winner-${state.activeYear}`);
-  els.winnerImage.src = savedImage || "Logo - Copia.png";
-
   if (!yearData) return;
   renderWinner(yearData);
   renderRanking();
@@ -676,9 +677,13 @@ function renderWinner(yearData) {
     els.winnerName.textContent = "Sem dados";
     els.winnerScore.textContent = "0";
     els.winnerLevel.textContent = "Nível acumulado";
+    els.winnerImage.src = "Logo - Copia.png";
     setWinnerMasked(false);
     return;
   }
+
+  const savedImage = localStorage.getItem(getWinnerPhotoKey(winner.name));
+  els.winnerImage.src = savedImage || "Logo - Copia.png";
 
   const privacy = state.namesPrivacy;
   setWinnerMasked(privacy.active && !privacy.championRevealed);

@@ -563,7 +563,10 @@ h1 {
   height: 168px;
   margin: 0 auto;
   border-radius: 50%;
-  border: 1px dashed var(--line);
+  border: 3px solid var(--gold);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--gold) 18%, transparent),
+    0 14px 30px rgba(0, 0, 0, 0.18);
   background:
     radial-gradient(circle at 50% 38%, rgba(229, 192, 124, 0.36), transparent 56%),
     color-mix(in srgb, var(--surface-soft) 82%, #e5c07c 18%);
