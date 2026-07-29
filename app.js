@@ -263,7 +263,7 @@ function getWinnerPhotoKey(name) {
 }
 
 function restorePreferences() {
-  const theme = localStorage.getItem("jornada-sava-theme") || "light";
+  const theme = localStorage.getItem("jornada-sava-theme") || "dark";
   setTheme(theme);
 
   setFiltersHidden(localStorage.getItem("jornada-sava-filters-hidden") === "true");
