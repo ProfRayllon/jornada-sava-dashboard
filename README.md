@@ -80,5 +80,6 @@ Para receber o selo, o advogado precisa atingir `2.000 / 2.000` nessa régua nor
 ## Ajustes rápidos
 
 - Paleta e layout ficam em `styles.css`.
+- Fotos fixas dos vencedores ficam em `img/vencedor-2025.png` e `img/vencedor-2026.jpeg`.
 - Para trocar os selos, substitua os PNGs dentro de `icones_selos`.
 - Se atualizar as planilhas, rode `python scripts\build_tratamento_2026.py` e depois `python scripts\build_dados_painel.py` para gerar novamente `Tratamento - base 2026.xlsx`, `dados-painel.js` e `dados-painel.json`.

@@ -53,6 +53,17 @@
           </label>
 
           <label class="field">
+            <span>Nível</span>
+            <select id="levelFilter">
+              <option value="all">Todos</option>
+              <option value="explorador">Explorador SAVA</option>
+              <option value="protagonista">Protagonista SAVA</option>
+              <option value="lider">Líder SAVA</option>
+              <option value="guardiao">Guardião SAVA</option>
+            </select>
+          </label>
+
+          <label class="field">
             <span>Área</span>
             <select id="categoryFilter">
               <option value="all">Todas</option>
@@ -68,13 +79,11 @@
             <div class="winner-sparkles" aria-hidden="true">
               <span></span><span></span><span></span><span></span><span></span>
               <span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
+              <span></span><span></span><span></span><span></span><span></span>
             </div>
             <div class="winner-image-frame" id="winnerImageFrame">
               <img id="winnerImage" src="Logo - Copia.png" alt="Imagem do destaque" />
-              <label class="image-picker" aria-label="Trocar imagem do destaque" title="Trocar imagem">
-                <input id="winnerImageInput" type="file" accept="image/*" />
-              </label>
             </div>
             <div class="winner-copy">
               <p class="panel-kicker" id="winnerKicker">Destaque 2026</p>
@@ -105,7 +114,12 @@
                     <th>Área</th>
                     <th>Nível</th>
                     <th class="numeric">Rank</th>
-                    <th class="numeric">Total p/ nível</th>
+                    <th class="numeric sortable-heading" aria-sort="none">
+                      <button class="sort-button" id="experienceSort" type="button" aria-label="Ordenar experiência">
+                        <span>Experiência</span>
+                        <span class="sort-arrow" aria-hidden="true"></span>
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="rankingBody"></tbody>

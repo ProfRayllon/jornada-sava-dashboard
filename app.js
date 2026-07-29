@@ -57,6 +57,11 @@ const levelRules = [
   { name: "Guardião SAVA", min: 23001, max: Infinity, slug: "guardiao" },
 ];
 
+const winnerPhotosByYear = {
+  2025: "img/vencedor-2025.png",
+  2026: "img/vencedor-2026.jpeg",
+};
+
 const badgeDefinitions = [
   {
     id: "happy",
@@ -93,6 +98,8 @@ const state = {
   cumulative: new Map(),
   search: "",
   category: "all",
+  level: "all",
+  experienceSort: null,
   badgesExpanded: false,
   activeBadgeId: null,
   namesPrivacy: {
@@ -117,10 +124,11 @@ const els = {
   winnerScore: document.querySelector("#winnerScore"),
   winnerLevel: document.querySelector("#winnerLevel"),
   winnerImage: document.querySelector("#winnerImage"),
-  winnerImageInput: document.querySelector("#winnerImageInput"),
   winnerImageFrame: document.querySelector("#winnerImageFrame"),
   searchInput: document.querySelector("#searchInput"),
+  levelFilter: document.querySelector("#levelFilter"),
   categoryFilter: document.querySelector("#categoryFilter"),
+  experienceSort: document.querySelector("#experienceSort"),
   lastUpdated: document.querySelector("#lastUpdated"),
   themeToggle: document.querySelector("#themeToggle"),
   filterToggle: document.querySelector("#filterToggle"),
@@ -160,8 +168,18 @@ function bindEvents() {
     renderRanking();
   });
 
+  els.levelFilter.addEventListener("change", (event) => {
+    state.level = event.target.value;
+    renderRanking();
+  });
+
   els.categoryFilter.addEventListener("change", (event) => {
     state.category = event.target.value;
+    renderRanking();
+  });
+
+  els.experienceSort.addEventListener("click", () => {
+    state.experienceSort = state.experienceSort === "desc" ? "asc" : "desc";
     renderRanking();
   });
 
@@ -243,23 +261,10 @@ function bindEvents() {
     if (event.key === "Escape" && els.winnerModal.classList.contains("open")) closeWinnerModal();
   });
 
-  els.winnerImageInput.addEventListener("change", (event) => {
-    const [file] = event.target.files;
-    if (!file) return;
-    const yearData = state.years.get(state.activeYear);
-    const winner = yearData?.ranking[0];
-    if (!winner) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      els.winnerImage.src = reader.result;
-      localStorage.setItem(getWinnerPhotoKey(winner.name), reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
-function getWinnerPhotoKey(name) {
-  return `jornada-sava-winner-photo-${normalize(name)}`;
+function getDefaultWinnerPhoto(year) {
+  return winnerPhotosByYear[Number(year)] || "Logo - Copia.png";
 }
 
 function restorePreferences() {
@@ -677,13 +682,12 @@ function renderWinner(yearData) {
     els.winnerName.textContent = "Sem dados";
     els.winnerScore.textContent = "0";
     els.winnerLevel.textContent = "Nível acumulado";
-    els.winnerImage.src = "Logo - Copia.png";
+    els.winnerImage.src = getDefaultWinnerPhoto(yearData.year);
     setWinnerMasked(false);
     return;
   }
 
-  const savedImage = localStorage.getItem(getWinnerPhotoKey(winner.name));
-  els.winnerImage.src = savedImage || "Logo - Copia.png";
+  els.winnerImage.src = getDefaultWinnerPhoto(yearData.year);
 
   const privacy = state.namesPrivacy;
   setWinnerMasked(privacy.active && !privacy.championRevealed);
@@ -756,12 +760,25 @@ function renderRanking() {
   if (!yearData) return;
 
   const filtered = yearData.ranking.filter((person) => {
+    const level = getPersonLevel(person);
     const matchesSearch = normalize(person.name).includes(normalize(state.search));
     const matchesCategory = state.category === "all" || person.category === state.category;
-    return matchesSearch && matchesCategory;
+    const matchesLevel = state.level === "all" || level.slug === state.level;
+    return matchesSearch && matchesCategory && matchesLevel;
   });
 
-  els.rankingCount.textContent = `${filtered.length} pessoas`;
+  if (state.experienceSort) {
+    filtered.sort((a, b) => {
+      const order = state.experienceSort === "asc" ? 1 : -1;
+      return (getCumulativeScore(a) - getCumulativeScore(b)) * order || b.score - a.score || a.name.localeCompare(b.name);
+    });
+  }
+
+  updateExperienceSortControl();
+  const hasActiveFilters = Boolean(state.search.trim()) || state.category !== "all" || state.level !== "all";
+  els.rankingCount.textContent = hasActiveFilters
+    ? `${filtered.length} de ${yearData.ranking.length} pessoas`
+    : `${filtered.length} pessoas`;
 
   if (!filtered.length) {
     els.rankingBody.innerHTML = `<tr><td colspan="6"><div class="empty-state">Nenhum resultado encontrado.</div></td></tr>`;
@@ -816,6 +833,21 @@ function renderRanking() {
       `;
     })
     .join("");
+}
+
+function updateExperienceSortControl() {
+  if (!els.experienceSort) return;
+  const direction = state.experienceSort;
+  const header = els.experienceSort.closest("th");
+  els.experienceSort.classList.toggle("is-sorted", Boolean(direction));
+  els.experienceSort.dataset.direction = direction || "none";
+  els.experienceSort.setAttribute(
+    "aria-label",
+    direction === "asc" ? "Ordenar experiência do maior para o menor" : "Ordenar experiência do menor para o maior"
+  );
+  if (header) {
+    header.setAttribute("aria-sort", direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none");
+  }
 }
 
 function renderBadges(yearData) {
