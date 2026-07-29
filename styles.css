@@ -1991,30 +1991,29 @@ footer {
 
 .winner-modal-rays {
   position: absolute;
-  inset: -26%;
+  inset: -6%;
   z-index: 0;
   border-radius: 50%;
   background: radial-gradient(
     circle,
-    rgba(229, 192, 124, 0.75) 0%,
-    rgba(229, 192, 124, 0.36) 40%,
-    rgba(229, 192, 124, 0.12) 62%,
+    rgba(229, 192, 124, 0.3) 0%,
+    rgba(229, 192, 124, 0.14) 55%,
     transparent 78%
   );
-  filter: blur(22px);
+  filter: blur(10px);
   animation: winner-glow-pulse 3.4s ease-in-out infinite;
 }
 
 @keyframes winner-glow-pulse {
   0%,
   100% {
-    opacity: 0.75;
+    opacity: 0.6;
     transform: scale(1);
   }
 
   50% {
-    opacity: 1;
-    transform: scale(1.12);
+    opacity: 0.95;
+    transform: scale(1.05);
   }
 }
 
