@@ -1824,58 +1824,32 @@ footer {
   height: 168px;
 }
 
-.winner-modal-photo-wrap::before {
-  content: "";
-  position: absolute;
-  inset: -12%;
-  z-index: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(229, 192, 124, 0.5), transparent 70%);
-  filter: blur(18px);
-}
-
 .winner-modal-rays {
   position: absolute;
-  inset: -75%;
+  inset: -26%;
   z-index: 0;
-  background: conic-gradient(
-    from 0deg,
-    transparent 0deg,
-    rgba(229, 192, 124, 0.5) 5deg,
-    transparent 12deg,
-    transparent 42deg,
-    rgba(229, 192, 124, 0.32) 47deg,
-    transparent 54deg,
-    transparent 84deg,
-    rgba(255, 243, 208, 0.46) 89deg,
-    transparent 96deg,
-    transparent 126deg,
-    rgba(229, 192, 124, 0.3) 131deg,
-    transparent 138deg,
-    transparent 168deg,
-    rgba(229, 192, 124, 0.46) 173deg,
-    transparent 180deg,
-    transparent 210deg,
-    rgba(229, 192, 124, 0.3) 215deg,
-    transparent 222deg,
-    transparent 252deg,
-    rgba(255, 243, 208, 0.42) 257deg,
-    transparent 264deg,
-    transparent 294deg,
-    rgba(229, 192, 124, 0.3) 299deg,
-    transparent 306deg,
-    transparent 336deg,
-    rgba(229, 192, 124, 0.42) 341deg,
-    transparent 348deg
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(229, 192, 124, 0.75) 0%,
+    rgba(229, 192, 124, 0.36) 40%,
+    rgba(229, 192, 124, 0.12) 62%,
+    transparent 78%
   );
-  filter: blur(2px);
-  opacity: 0.85;
-  animation: winner-rays-spin 16s linear infinite;
+  filter: blur(22px);
+  animation: winner-glow-pulse 3.4s ease-in-out infinite;
 }
 
-@keyframes winner-rays-spin {
-  to {
-    transform: rotate(360deg);
+@keyframes winner-glow-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
   }
 }
 
