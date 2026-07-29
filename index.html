@@ -137,17 +137,27 @@
       <div class="winner-modal-confetti" id="winnerConfetti" aria-hidden="true"></div>
       <section class="winner-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="winnerModalName">
         <button class="modal-close" type="button" id="winnerModalClose" aria-label="Fechar celebração"></button>
-        <p class="winner-modal-kicker">Campeão do ciclo</p>
         <div class="winner-modal-photo-wrap">
+          <div class="winner-modal-rays" aria-hidden="true"></div>
           <div class="winner-modal-glow" aria-hidden="true"></div>
           <img id="winnerModalPhoto" src="" alt="" />
         </div>
-        <h2 id="winnerModalName">Nome</h2>
-        <p class="winner-modal-level" id="winnerModalLevel">Nível</p>
-        <div class="winner-modal-score">
-          <img src="icones/trofeu.png" alt="" aria-hidden="true" />
-          <strong id="winnerModalScore">0</strong>
-          <small>Savacoins</small>
+        <div class="winner-modal-copy">
+          <p class="winner-modal-kicker">Campeão do ciclo</p>
+          <h2 id="winnerModalName">Nome</h2>
+          <p class="winner-modal-level" id="winnerModalLevel">Nível</p>
+          <div class="winner-modal-score">
+            <img src="icones/trofeu.png" alt="" aria-hidden="true" />
+            <strong id="winnerModalScore">0</strong>
+            <small>Savacoins</small>
+          </div>
+          <div class="winner-modal-divider" aria-hidden="true">
+            <span></span>
+            <em>✦</em>
+            <span></span>
+          </div>
+          <p class="winner-modal-subtitle">Reconhecimento máximo deste ciclo.</p>
+          <button type="button" class="winner-modal-continue" id="winnerModalContinue">Continuar</button>
         </div>
       </section>
     </div>

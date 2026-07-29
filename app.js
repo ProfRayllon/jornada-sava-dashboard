@@ -129,6 +129,7 @@ const els = {
   namesToggleIcon: document.querySelector("#namesToggleIcon"),
   winnerModal: document.querySelector("#winnerModal"),
   winnerModalClose: document.querySelector("#winnerModalClose"),
+  winnerModalContinue: document.querySelector("#winnerModalContinue"),
   winnerModalPhoto: document.querySelector("#winnerModalPhoto"),
   winnerModalName: document.querySelector("#winnerModalName"),
   winnerModalLevel: document.querySelector("#winnerModalLevel"),
@@ -200,6 +201,7 @@ function bindEvents() {
   });
 
   els.winnerModalClose.addEventListener("click", closeWinnerModal);
+  els.winnerModalContinue.addEventListener("click", closeWinnerModal);
   els.winnerModal.addEventListener("click", (event) => {
     if (event.target.matches("[data-close-winner-modal]")) closeWinnerModal();
   });
@@ -703,20 +705,22 @@ function revealChampion() {
 
 const confettiColors = ["#e5c07c", "#f0cf8e", "#fff3d0", "#b99243", "#ffffff"];
 
-function spawnConfetti(container, count = 70) {
+function spawnConfetti(container, count = 150) {
   container.innerHTML = "";
   const frag = document.createDocumentFragment();
   for (let i = 0; i < count; i++) {
     const piece = document.createElement("span");
+    const isRound = Math.random() < 0.4;
     piece.className = "confetti-piece";
-    const size = 6 + Math.random() * 6;
+    const size = 5 + Math.random() * 7;
     piece.style.left = `${Math.random() * 100}%`;
     piece.style.width = `${size}px`;
-    piece.style.height = `${size * 1.6}px`;
+    piece.style.height = `${isRound ? size : size * 1.7}px`;
+    piece.style.borderRadius = isRound ? "50%" : "2px";
     piece.style.background = confettiColors[Math.floor(Math.random() * confettiColors.length)];
-    piece.style.animationDuration = `${2.6 + Math.random() * 1.8}s`;
-    piece.style.animationDelay = `${Math.random() * 0.5}s`;
-    piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 220}px`);
+    piece.style.animationDuration = `${4.2 + Math.random() * 3.2}s`;
+    piece.style.animationDelay = `${Math.random() * 3.2}s`;
+    piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 260}px`);
     frag.appendChild(piece);
   }
   container.appendChild(frag);
