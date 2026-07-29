@@ -242,22 +242,24 @@ h1 {
   grid-template-columns: auto minmax(220px, 1fr) minmax(210px, 280px);
   gap: 14px;
   align-items: end;
-  margin-top: 10px;
-  padding: 12px;
+  margin-top: 8px;
+  padding: 8px 10px;
 }
 
 .segmented-control {
   display: inline-grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 8px;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 7px;
   background: var(--surface-soft);
 }
 
 .segment {
-  min-width: 98px;
-  padding: 0 14px;
+  min-width: 88px;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 0.86rem;
   box-shadow: none;
   white-space: nowrap;
 }
@@ -274,25 +276,26 @@ h1 {
 
 .field {
   display: grid;
-  gap: 5px;
+  gap: 3px;
 }
 
 .field span {
   color: var(--muted);
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   font-weight: 800;
   text-transform: uppercase;
 }
 
 .field input,
 .field select {
-  min-height: 42px;
+  min-height: 32px;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
   background: var(--surface);
   color: var(--text);
-  padding: 0 12px;
+  padding: 0 10px;
+  font-size: 0.9rem;
 }
 
 .dashboard-grid {
