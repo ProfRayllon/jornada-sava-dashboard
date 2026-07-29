@@ -118,6 +118,8 @@ const els = {
   winnerLevel: document.querySelector("#winnerLevel"),
   winnerImage: document.querySelector("#winnerImage"),
   winnerImageInput: document.querySelector("#winnerImageInput"),
+  winnerImageFrame: document.querySelector("#winnerImageFrame"),
+  winnerRevealBtn: document.querySelector("#winnerRevealBtn"),
   searchInput: document.querySelector("#searchInput"),
   categoryFilter: document.querySelector("#categoryFilter"),
   lastUpdated: document.querySelector("#lastUpdated"),
@@ -126,6 +128,13 @@ const els = {
   controlStrip: document.querySelector("#controlStrip"),
   namesToggle: document.querySelector("#namesToggle"),
   namesToggleIcon: document.querySelector("#namesToggleIcon"),
+  winnerModal: document.querySelector("#winnerModal"),
+  winnerModalClose: document.querySelector("#winnerModalClose"),
+  winnerModalPhoto: document.querySelector("#winnerModalPhoto"),
+  winnerModalName: document.querySelector("#winnerModalName"),
+  winnerModalLevel: document.querySelector("#winnerModalLevel"),
+  winnerModalScore: document.querySelector("#winnerModalScore"),
+  winnerConfetti: document.querySelector("#winnerConfetti"),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -183,12 +192,19 @@ function bindEvents() {
     }
     updateNamesToggleButton();
     renderRanking();
+    renderWinner(state.years.get(state.activeYear));
   });
 
   els.rankingBody.addEventListener("click", (event) => {
     if (!event.target.closest("[data-reveal-champion]")) return;
-    state.namesPrivacy.championRevealed = true;
-    renderRanking();
+    revealChampion();
+  });
+
+  els.winnerRevealBtn.addEventListener("click", revealChampion);
+
+  els.winnerModalClose.addEventListener("click", closeWinnerModal);
+  els.winnerModal.addEventListener("click", (event) => {
+    if (event.target.matches("[data-close-winner-modal]")) closeWinnerModal();
   });
 
   els.badgesToggle.addEventListener("click", () => {
@@ -225,6 +241,7 @@ function bindEvents() {
     if (event.key === "Escape" && els.badgeModal.classList.contains("open")) closeBadgeModal();
     if (event.key === "ArrowLeft" && els.badgeModal.classList.contains("open")) navigateBadgeModal(-1);
     if (event.key === "ArrowRight" && els.badgeModal.classList.contains("open")) navigateBadgeModal(1);
+    if (event.key === "Escape" && els.winnerModal.classList.contains("open")) closeWinnerModal();
   });
 
   els.winnerImageInput.addEventListener("change", (event) => {
@@ -660,12 +677,73 @@ function renderWinner(yearData) {
     els.winnerName.textContent = "Sem dados";
     els.winnerScore.textContent = "0";
     els.winnerLevel.textContent = "Nível acumulado";
+    setWinnerMasked(false);
     return;
   }
 
+  const privacy = state.namesPrivacy;
+  setWinnerMasked(privacy.active && !privacy.championRevealed);
   els.winnerName.textContent = winner.name;
   els.winnerScore.textContent = formatNumber(winner.score);
   els.winnerLevel.textContent = getPersonLevel(winner).name;
+}
+
+function setWinnerMasked(masked) {
+  els.winnerImageFrame.classList.toggle("is-masked", masked);
+  els.winnerName.classList.toggle("is-blurred", masked);
+  els.winnerRevealBtn.hidden = !masked;
+}
+
+function revealChampion() {
+  if (state.namesPrivacy.championRevealed) return;
+  state.namesPrivacy.championRevealed = true;
+
+  const yearData = state.years.get(state.activeYear);
+  const winner = yearData?.ranking[0];
+  renderRanking();
+  renderWinner(yearData);
+  openWinnerModal(winner);
+}
+
+const confettiColors = ["#e5c07c", "#f0cf8e", "#fff3d0", "#b99243", "#ffffff"];
+
+function spawnConfetti(container, count = 70) {
+  container.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement("span");
+    piece.className = "confetti-piece";
+    const size = 6 + Math.random() * 6;
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.width = `${size}px`;
+    piece.style.height = `${size * 1.6}px`;
+    piece.style.background = confettiColors[Math.floor(Math.random() * confettiColors.length)];
+    piece.style.animationDuration = `${2.6 + Math.random() * 1.8}s`;
+    piece.style.animationDelay = `${Math.random() * 0.5}s`;
+    piece.style.setProperty("--drift", `${(Math.random() - 0.5) * 220}px`);
+    frag.appendChild(piece);
+  }
+  container.appendChild(frag);
+}
+
+function openWinnerModal(winner) {
+  if (!winner) return;
+  els.winnerModalPhoto.src = els.winnerImage.src;
+  els.winnerModalName.textContent = winner.name;
+  els.winnerModalLevel.textContent = getPersonLevel(winner).name;
+  els.winnerModalScore.textContent = formatNumber(winner.score);
+  spawnConfetti(els.winnerConfetti);
+  els.winnerModal.classList.add("open");
+  els.winnerModal.setAttribute("aria-hidden", "false");
+  document.body.classList.add("modal-open");
+  els.winnerModalClose.focus();
+}
+
+function closeWinnerModal() {
+  els.winnerModal.classList.remove("open");
+  els.winnerModal.setAttribute("aria-hidden", "true");
+  document.body.classList.remove("modal-open");
+  els.winnerConfetti.innerHTML = "";
 }
 
 function renderRanking() {

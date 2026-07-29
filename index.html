@@ -64,7 +64,7 @@
 
         <section class="dashboard-grid">
           <aside class="winner-panel" aria-label="Destaque do ano">
-            <div class="winner-image-frame">
+            <div class="winner-image-frame" id="winnerImageFrame">
               <img id="winnerImage" src="Logo - Copia.png" alt="Imagem do destaque" />
               <label class="image-picker" aria-label="Trocar imagem do destaque" title="Trocar imagem">
                 <input id="winnerImageInput" type="file" accept="image/*" />
@@ -73,6 +73,10 @@
             <div class="winner-copy">
               <p class="panel-kicker" id="winnerKicker">Destaque 2026</p>
               <h2 id="winnerName">Carregando...</h2>
+              <button type="button" class="champion-reveal-btn winner-reveal-btn" id="winnerRevealBtn" hidden>
+                <img src="icones/trofeu.png" alt="" aria-hidden="true" />
+                Revelar campeão
+              </button>
               <div class="score-tile">
                 <img src="icones/trofeu.png" alt="" aria-hidden="true" />
                 <strong id="winnerScore">0</strong>
@@ -130,6 +134,26 @@
         <span>Dados carregados das planilhas Jornada SAVA 2025 e 2026.</span>
         <span id="lastUpdated">Atualizando...</span>
       </footer>
+    </div>
+
+    <div class="winner-modal" id="winnerModal" aria-hidden="true">
+      <div class="winner-modal-backdrop" data-close-winner-modal></div>
+      <div class="winner-modal-confetti" id="winnerConfetti" aria-hidden="true"></div>
+      <section class="winner-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="winnerModalName">
+        <button class="modal-close" type="button" id="winnerModalClose" aria-label="Fechar celebração"></button>
+        <p class="winner-modal-kicker">Campeão do ciclo</p>
+        <div class="winner-modal-photo-wrap">
+          <div class="winner-modal-glow" aria-hidden="true"></div>
+          <img id="winnerModalPhoto" src="" alt="" />
+        </div>
+        <h2 id="winnerModalName">Nome</h2>
+        <p class="winner-modal-level" id="winnerModalLevel">Nível</p>
+        <div class="winner-modal-score">
+          <img src="icones/trofeu.png" alt="" aria-hidden="true" />
+          <strong id="winnerModalScore">0</strong>
+          <small>Savacoins</small>
+        </div>
+      </section>
     </div>
 
     <div class="badge-modal" id="badgeModal" aria-hidden="true">
