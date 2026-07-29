@@ -402,18 +402,18 @@ h1 {
   position: absolute;
   top: -60%;
   left: -60%;
-  width: 24%;
+  width: 13%;
   height: 220%;
   background: linear-gradient(
     100deg,
     transparent,
-    rgba(255, 255, 255, 0.1) 46%,
-    rgba(229, 192, 124, 0.24) 50%,
-    rgba(255, 255, 255, 0.1) 54%,
+    rgba(255, 255, 255, 0.06) 46%,
+    rgba(229, 192, 124, 0.14) 50%,
+    rgba(255, 255, 255, 0.06) 54%,
     transparent
   );
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.7) 55%, transparent 92%);
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.7) 55%, transparent 92%);
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.45) 50%, transparent 88%);
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.45) 50%, transparent 88%);
   transform: rotate(10deg);
   animation: winner-shine-sweep 7s ease-in-out infinite;
 }
@@ -440,12 +440,12 @@ h1 {
 
 .winner-sparkles span {
   position: absolute;
-  width: 3px;
-  height: 3px;
+  width: 2px;
+  height: 2px;
   border-radius: 50%;
   background: #f0cf8e;
   opacity: 0;
-  box-shadow: 0 0 4px 0.5px rgba(229, 192, 124, 0.55);
+  box-shadow: 0 0 3px 0.5px rgba(229, 192, 124, 0.35);
   animation: winner-sparkle-float 5s ease-in-out infinite;
 }
 
@@ -457,7 +457,7 @@ h1 {
   }
 
   50% {
-    opacity: 0.65;
+    opacity: 0.4;
     transform: translateY(-12px) scale(1);
   }
 }
