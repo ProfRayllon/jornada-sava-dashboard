@@ -99,6 +99,7 @@ const state = {
   search: "",
   category: "all",
   level: "all",
+  rankSort: null,
   experienceSort: null,
   badgesExpanded: false,
   activeBadgeId: null,
@@ -128,6 +129,7 @@ const els = {
   searchInput: document.querySelector("#searchInput"),
   levelFilter: document.querySelector("#levelFilter"),
   categoryFilter: document.querySelector("#categoryFilter"),
+  rankSort: document.querySelector("#rankSort"),
   experienceSort: document.querySelector("#experienceSort"),
   lastUpdated: document.querySelector("#lastUpdated"),
   themeToggle: document.querySelector("#themeToggle"),
@@ -178,8 +180,15 @@ function bindEvents() {
     renderRanking();
   });
 
+  els.rankSort.addEventListener("click", () => {
+    state.rankSort = state.rankSort === "desc" ? "asc" : "desc";
+    state.experienceSort = null;
+    renderRanking();
+  });
+
   els.experienceSort.addEventListener("click", () => {
     state.experienceSort = state.experienceSort === "desc" ? "asc" : "desc";
+    state.rankSort = null;
     renderRanking();
   });
 
@@ -767,14 +776,19 @@ function renderRanking() {
     return matchesSearch && matchesCategory && matchesLevel;
   });
 
-  if (state.experienceSort) {
+  if (state.rankSort) {
+    filtered.sort((a, b) => {
+      const order = state.rankSort === "asc" ? 1 : -1;
+      return (a.score - b.score) * order || getCumulativeScore(b) - getCumulativeScore(a) || a.name.localeCompare(b.name);
+    });
+  } else if (state.experienceSort) {
     filtered.sort((a, b) => {
       const order = state.experienceSort === "asc" ? 1 : -1;
       return (getCumulativeScore(a) - getCumulativeScore(b)) * order || b.score - a.score || a.name.localeCompare(b.name);
     });
   }
 
-  updateExperienceSortControl();
+  updateSortControls();
   const hasActiveFilters = Boolean(state.search.trim()) || state.category !== "all" || state.level !== "all";
   els.rankingCount.textContent = hasActiveFilters
     ? `${filtered.length} de ${yearData.ranking.length} pessoas`
@@ -835,15 +849,19 @@ function renderRanking() {
     .join("");
 }
 
-function updateExperienceSortControl() {
-  if (!els.experienceSort) return;
-  const direction = state.experienceSort;
-  const header = els.experienceSort.closest("th");
-  els.experienceSort.classList.toggle("is-sorted", Boolean(direction));
-  els.experienceSort.dataset.direction = direction || "none";
-  els.experienceSort.setAttribute(
+function updateSortControls() {
+  updateSortControl(els.rankSort, state.rankSort, "rank");
+  updateSortControl(els.experienceSort, state.experienceSort, "experiência");
+}
+
+function updateSortControl(button, direction, label) {
+  if (!button) return;
+  const header = button.closest("th");
+  button.classList.toggle("is-sorted", Boolean(direction));
+  button.dataset.direction = direction || "none";
+  button.setAttribute(
     "aria-label",
-    direction === "asc" ? "Ordenar experiência do maior para o menor" : "Ordenar experiência do menor para o maior"
+    direction === "asc" ? `Ordenar ${label} do maior para o menor` : `Ordenar ${label} do menor para o maior`
   );
   if (header) {
     header.setAttribute("aria-sort", direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none");
