@@ -1,0 +1,4 @@
+tmp/
+~$*.xlsx
+__pycache__/
+*.pyc

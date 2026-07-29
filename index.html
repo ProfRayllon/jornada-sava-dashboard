@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jornada SAVA</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="dados-painel.js" defer></script>
+    <script src="dados-jornada.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <img src="Logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
+        </div>
+        <div class="header-copy">
+          <p class="eyebrow">Painel acumulativo</p>
+          <h1>Jornada SAVA</h1>
+          <p>Fortalecendo a valorização, o engajamento e o desenvolvimento dos nossos talentos</p>
+        </div>
+        <div class="header-actions" aria-label="Ações do painel">
+          <button class="theme-switch" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
+            <span class="switch-icon switch-sun" aria-hidden="true">
+              <img src="icones/sun.png" alt="" />
+            </span>
+            <span class="switch-icon switch-moon" aria-hidden="true">
+              <img src="icones/moon.png" alt="" />
+            </span>
+            <span class="switch-knob" aria-hidden="true"></span>
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section class="control-strip" aria-label="Filtros do painel">
+          <div class="segmented-control" role="tablist" aria-label="Ano">
+            <button class="segment active" type="button" data-year="2026" role="tab" aria-selected="true">2026</button>
+            <button class="segment" type="button" data-year="2025" role="tab" aria-selected="false">Resultado 2025</button>
+          </div>
+
+          <label class="field">
+            <span>Buscar</span>
+            <input id="searchInput" type="search" placeholder="Nome da pessoa" />
+          </label>
+
+          <label class="field">
+            <span>Área</span>
+            <select id="categoryFilter">
+              <option value="all">Todas</option>
+              <option value="Advogados Associados">Advogados Associados</option>
+              <option value="Controladoria e Administrativo">Controladoria e Administrativo</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="dashboard-grid">
+          <aside class="winner-panel" aria-label="Destaque do ano">
+            <div class="winner-image-frame">
+              <img id="winnerImage" src="Logo - Copia.png" alt="Imagem do destaque" />
+              <label class="image-picker" aria-label="Trocar imagem do destaque" title="Trocar imagem">
+                <input id="winnerImageInput" type="file" accept="image/*" />
+              </label>
+            </div>
+            <div class="winner-copy">
+              <p class="panel-kicker" id="winnerKicker">Destaque 2026</p>
+              <h2 id="winnerName">Carregando...</h2>
+              <div class="score-tile">
+                <img src="icones/trofeu.png" alt="" aria-hidden="true" />
+                <strong id="winnerScore">0</strong>
+                <small>Savacoins</small>
+              </div>
+              <p id="winnerLevel" class="winner-level">Nível acumulado</p>
+            </div>
+          </aside>
+
+          <section class="ranking-panel" aria-label="Ranking">
+            <div class="section-heading">
+              <div>
+                <p class="panel-kicker">Classificação</p>
+                <h2 id="rankingTitle">Ranking 2026</h2>
+              </div>
+              <span id="rankingCount" class="count-pill">0 pessoas</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Pos.</th>
+                    <th>Nome</th>
+                    <th>Área</th>
+                    <th>Nível</th>
+                    <th class="numeric">Rank</th>
+                    <th class="numeric">Total para nível</th>
+                  </tr>
+                </thead>
+                <tbody id="rankingBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+        </section>
+
+        <section class="badges-panel" aria-label="Selos do ciclo">
+          <div class="section-heading compact">
+            <div>
+              <p class="panel-kicker">Reconhecimento</p>
+              <h2>Selos do ano</h2>
+              <p class="section-subtitle">Celebre conquistas que inspiram e transformam.</p>
+            </div>
+            <button class="ghost-action" id="badgesToggle" type="button">
+              Ver todos
+              <span aria-hidden="true">›</span>
+            </button>
+          </div>
+          <div id="badgesList" class="badge-list"></div>
+        </section>
+
+      </main>
+
+      <footer>
+        <span>Dados carregados das planilhas Jornada SAVA 2025 e 2026.</span>
+        <span id="lastUpdated">Atualizando...</span>
+      </footer>
+    </div>
+
+    <div class="badge-modal" id="badgeModal" aria-hidden="true">
+      <div class="badge-modal-backdrop" data-close-badge-modal></div>
+      <section class="badge-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="badgeModalTitle">
+        <button class="modal-close" type="button" id="badgeModalClose" aria-label="Fechar detalhes do selo">×</button>
+        <div class="modal-feature" id="badgeModalFeature"></div>
+        <aside class="modal-list-panel">
+          <p class="panel-kicker">Contemplados deste selo</p>
+          <div id="badgeModalList"></div>
+        </aside>
+      </section>
+    </div>
+  </body>
+</html>
