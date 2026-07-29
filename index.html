@@ -22,6 +22,9 @@
           <p>Fortalecendo a valorização, o engajamento e o desenvolvimento dos nossos talentos</p>
         </div>
         <div class="header-actions" aria-label="Ações do painel">
+          <button class="icon-action" id="filterToggle" type="button" aria-label="Mostrar ou ocultar filtros" title="Mostrar/ocultar filtros" aria-pressed="false">
+            <img src="icones/filter.png" alt="" />
+          </button>
           <button class="theme-switch" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
             <span class="switch-icon switch-sun" aria-hidden="true">
               <img src="icones/sun.png" alt="" />
@@ -35,7 +38,7 @@
       </header>
 
       <main>
-        <section class="control-strip" aria-label="Filtros do painel">
+        <section class="control-strip" id="controlStrip" aria-label="Filtros do painel">
           <div class="segmented-control" role="tablist" aria-label="Ano">
             <button class="segment active" type="button" data-year="2026" role="tab" aria-selected="true">2026</button>
             <button class="segment" type="button" data-year="2025" role="tab" aria-selected="false">Resultado 2025</button>

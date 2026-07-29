@@ -169,6 +169,47 @@ h1 {
   font-size: 1.2rem;
 }
 
+.icon-action {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+
+.icon-action img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+[data-theme="dark"] .icon-action img {
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+}
+
+.icon-action:hover {
+  border-color: var(--gold-strong);
+  transform: translateY(-1px);
+}
+
+.icon-action[aria-pressed="true"] {
+  background: var(--gold);
+  border-color: var(--gold);
+}
+
+.icon-action[aria-pressed="true"] img {
+  opacity: 1;
+  filter: brightness(0);
+}
+
 .theme-switch {
   position: relative;
   display: inline-grid;
@@ -244,6 +285,26 @@ h1 {
   align-items: end;
   margin-top: 8px;
   padding: 8px 10px;
+  max-height: 260px;
+  overflow: hidden;
+  transition:
+    max-height 220ms ease,
+    opacity 180ms ease,
+    margin-top 220ms ease,
+    padding 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.control-strip.is-collapsed {
+  max-height: 0;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+  border-color: transparent;
+  box-shadow: none;
+  pointer-events: none;
 }
 
 .segmented-control {

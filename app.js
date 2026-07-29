@@ -117,6 +117,8 @@ const els = {
   categoryFilter: document.querySelector("#categoryFilter"),
   lastUpdated: document.querySelector("#lastUpdated"),
   themeToggle: document.querySelector("#themeToggle"),
+  filterToggle: document.querySelector("#filterToggle"),
+  controlStrip: document.querySelector("#controlStrip"),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -151,6 +153,12 @@ function bindEvents() {
     const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
     setTheme(next);
     localStorage.setItem("jornada-sava-theme", next);
+  });
+
+  els.filterToggle.addEventListener("click", () => {
+    const hidden = !els.controlStrip.classList.contains("is-collapsed");
+    setFiltersHidden(hidden);
+    localStorage.setItem("jornada-sava-filters-hidden", String(hidden));
   });
 
   els.badgesToggle.addEventListener("click", () => {
@@ -205,8 +213,15 @@ function restorePreferences() {
   const theme = localStorage.getItem("jornada-sava-theme") || "light";
   setTheme(theme);
 
+  setFiltersHidden(localStorage.getItem("jornada-sava-filters-hidden") === "true");
+
   const savedImage = localStorage.getItem(`jornada-sava-winner-${state.activeYear}`);
   if (savedImage) els.winnerImage.src = savedImage;
+}
+
+function setFiltersHidden(hidden) {
+  els.controlStrip.classList.toggle("is-collapsed", hidden);
+  els.filterToggle.setAttribute("aria-pressed", String(hidden));
 }
 
 function setTheme(theme) {
