@@ -95,6 +95,11 @@ const state = {
   category: "all",
   badgesExpanded: false,
   activeBadgeId: null,
+  namesPrivacy: {
+    active: false,
+    othersRevealed: false,
+    championRevealed: false,
+  },
 };
 
 const els = {
@@ -119,6 +124,8 @@ const els = {
   themeToggle: document.querySelector("#themeToggle"),
   filterToggle: document.querySelector("#filterToggle"),
   controlStrip: document.querySelector("#controlStrip"),
+  namesToggle: document.querySelector("#namesToggle"),
+  namesToggleIcon: document.querySelector("#namesToggleIcon"),
 };
 
 document.addEventListener("DOMContentLoaded", init);
@@ -159,6 +166,29 @@ function bindEvents() {
     const hidden = !els.controlStrip.classList.contains("is-collapsed");
     setFiltersHidden(hidden);
     localStorage.setItem("jornada-sava-filters-hidden", String(hidden));
+  });
+
+  els.namesToggle.addEventListener("click", () => {
+    const privacy = state.namesPrivacy;
+    if (!privacy.active) {
+      privacy.active = true;
+      privacy.othersRevealed = false;
+      privacy.championRevealed = false;
+    } else if (!privacy.othersRevealed) {
+      privacy.othersRevealed = true;
+    } else {
+      privacy.active = false;
+      privacy.othersRevealed = false;
+      privacy.championRevealed = false;
+    }
+    updateNamesToggleButton();
+    renderRanking();
+  });
+
+  els.rankingBody.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-reveal-champion]")) return;
+    state.namesPrivacy.championRevealed = true;
+    renderRanking();
   });
 
   els.badgesToggle.addEventListener("click", () => {
@@ -222,6 +252,18 @@ function restorePreferences() {
 function setFiltersHidden(hidden) {
   els.controlStrip.classList.toggle("is-collapsed", hidden);
   els.filterToggle.setAttribute("aria-pressed", String(hidden));
+}
+
+function updateNamesToggleButton() {
+  const privacy = state.namesPrivacy;
+  const awaitingRevealAll = privacy.active && !privacy.othersRevealed;
+  els.namesToggleIcon.src = awaitingRevealAll ? "icones/view.png" : "icones/hide.png";
+  els.namesToggle.setAttribute("aria-pressed", String(privacy.active));
+  els.namesToggle.title = awaitingRevealAll
+    ? "Revelar todos (exceto o 1º lugar)"
+    : privacy.active
+      ? "Ocultar nomes novamente"
+      : "Ocultar nomes";
 }
 
 function setTheme(theme) {
@@ -654,15 +696,28 @@ function renderRanking() {
         Math.min(100, Math.round(((cumulative - level.min) / Math.max(1, tierMax - level.min)) * 100))
       );
       const rankClass = pos <= 3 ? ` rank-${pos}` : "";
+      const privacy = state.namesPrivacy;
+      const isChampion = pos === 1;
+      const championHidden = isChampion && privacy.active && !privacy.championRevealed;
+      const othersHidden = !isChampion && privacy.active && !privacy.othersRevealed;
+      const nameHidden = championHidden || othersHidden;
+      const nameCellMarkup = championHidden
+        ? `
+          <button type="button" class="champion-reveal-btn" data-reveal-champion>
+            <img src="icones/trofeu.png" alt="" aria-hidden="true" />
+            Revelar campeão
+          </button>
+        `
+        : `
+          <div class="person-cell">
+            <span class="avatar${nameHidden ? " is-masked" : ""}" aria-hidden="true">${nameHidden ? "?" : escapeHtml(getInitials(person.name))}</span>
+            <span class="person-name${nameHidden ? " is-blurred" : ""}">${escapeHtml(person.name)}</span>
+          </div>
+        `;
       return `
         <tr>
           <td><span class="rank-chip${rankClass}">${pos}</span></td>
-          <td class="name-cell">
-            <div class="person-cell">
-              <span class="avatar" aria-hidden="true">${escapeHtml(getInitials(person.name))}</span>
-              <span class="person-name">${escapeHtml(person.name)}</span>
-            </div>
-          </td>
+          <td class="name-cell">${nameCellMarkup}</td>
           <td>${escapeHtml(person.category)}</td>
           <td><span class="level-pill level-${level.slug}">${level.name}</span></td>
           <td class="numeric"><strong>${formatNumber(person.score)}</strong></td>
