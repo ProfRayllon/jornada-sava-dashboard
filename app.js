@@ -119,7 +119,6 @@ const els = {
   winnerImage: document.querySelector("#winnerImage"),
   winnerImageInput: document.querySelector("#winnerImageInput"),
   winnerImageFrame: document.querySelector("#winnerImageFrame"),
-  winnerRevealBtn: document.querySelector("#winnerRevealBtn"),
   searchInput: document.querySelector("#searchInput"),
   categoryFilter: document.querySelector("#categoryFilter"),
   lastUpdated: document.querySelector("#lastUpdated"),
@@ -199,8 +198,6 @@ function bindEvents() {
     if (!event.target.closest("[data-reveal-champion]")) return;
     revealChampion();
   });
-
-  els.winnerRevealBtn.addEventListener("click", revealChampion);
 
   els.winnerModalClose.addEventListener("click", closeWinnerModal);
   els.winnerModal.addEventListener("click", (event) => {
@@ -691,7 +688,6 @@ function renderWinner(yearData) {
 function setWinnerMasked(masked) {
   els.winnerImageFrame.classList.toggle("is-masked", masked);
   els.winnerName.classList.toggle("is-blurred", masked);
-  els.winnerRevealBtn.hidden = !masked;
 }
 
 function revealChampion() {

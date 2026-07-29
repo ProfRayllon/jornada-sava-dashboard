@@ -471,11 +471,6 @@ h1 {
   user-select: none;
 }
 
-.winner-reveal-btn {
-  justify-self: center;
-  margin: 0 0 10px;
-}
-
 .score-tile {
   align-self: stretch;
   display: grid;
