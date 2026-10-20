@@ -10,6 +10,7 @@
       // O painel faz parte do sistema: o servidor só entrega esta página com sessão ativa,
       // e aberta fora do sistema ela volta para dentro dele.
       if (window.top === window) location.replace("sistema.html#painel");
+      try { document.documentElement.dataset.theme = localStorage.getItem("jornada-sava-theme") || "light"; } catch (e) {}
     </script>
     <script src="base/dados-painel.js" defer></script>
     <script src="base/dados-jornada.js" defer></script>
@@ -17,7 +18,7 @@
     <script src="assets/js/regras.js" defer></script>
     <script src="assets/js/store.js" defer></script>
     <script src="assets/js/painel-bridge.js" defer></script>
-    <script src="assets/js/painel.js" defer></script>
+    <script src="assets/js/painel.js?v=2" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -35,15 +36,6 @@
           </button>
           <button class="icon-action" id="filterToggle" type="button" aria-label="Mostrar ou ocultar filtros" title="Mostrar/ocultar filtros" aria-pressed="false">
             <img src="assets/icones/filter.png" alt="" />
-          </button>
-          <button class="theme-switch" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
-            <span class="switch-icon switch-sun" aria-hidden="true">
-              <img src="assets/icones/sun.png" alt="" />
-            </span>
-            <span class="switch-icon switch-moon" aria-hidden="true">
-              <img src="assets/icones/moon.png" alt="" />
-            </span>
-            <span class="switch-knob" aria-hidden="true"></span>
           </button>
         </div>
       </header>

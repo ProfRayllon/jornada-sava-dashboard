@@ -193,12 +193,6 @@ function bindEvents() {
     renderRanking();
   });
 
-  els.themeToggle.addEventListener("click", () => {
-    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-    setTheme(next);
-    localStorage.setItem("jornada-sava-theme", next);
-  });
-
   els.filterToggle.addEventListener("click", () => {
     const hidden = !els.controlStrip.classList.contains("is-collapsed");
     setFiltersHidden(hidden);
@@ -278,7 +272,7 @@ function getDefaultWinnerPhoto(year) {
 }
 
 function restorePreferences() {
-  const theme = localStorage.getItem("jornada-sava-theme") || "dark";
+  const theme = localStorage.getItem("jornada-sava-theme") || "light";
   setTheme(theme);
 
   setFiltersHidden(localStorage.getItem("jornada-sava-filters-hidden") === "true");

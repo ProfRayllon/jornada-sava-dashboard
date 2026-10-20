@@ -9,6 +9,29 @@
   const hojeIso = () => new Date().toISOString().slice(0, 10);
   const dataBr = (iso) => (iso ? new Date(`${iso.slice(0, 10)}T12:00:00`).toLocaleDateString("pt-BR") : "—");
 
+  const ICONES = {
+    visao: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
+    painel: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v1.5A3.5 3.5 0 0 1 16.5 10M7 5H4v1.5A3.5 3.5 0 0 0 7.5 10"/>',
+    lancar: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    historico: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5M12 7.5V12l3 2"/>',
+    pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-3.5-5.8"/>',
+    equipe: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
+    senha: '<circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M16 7l3 3M14 9l2 2"/>',
+    site: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+    sair: '<path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3"/>',
+    lua: '<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>',
+    sol: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    recolher: '<path d="M11 17l-5-5 5-5M18 17l-5-5 5-5"/>',
+    felicidade: '<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.1a4.3 4.3 0 0 1 7.5 2.7C19.5 15.4 12 20 12 20z"/>',
+    evento: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14.5h3M8 17h6"/>',
+    avaliacao: '<rect x="5" y="4.5" width="14" height="16.5" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="M9 13l2 2 4-4"/>',
+    indicacao: '<rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M9 7.5V5.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M12 12v2"/>',
+    missao: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
+    protagonista: '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4L7.5 21l4.5-2.5 4.5 2.5-1.1-7.6"/>',
+  };
+  const ico = (nome) =>
+    `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome]}</svg>`;
+
   const perfis = {
     admin: { nome: "Administrador", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
     rh: { nome: "RH", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
@@ -16,12 +39,12 @@
   };
 
   const tipos = {
-    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros (575 Savacoins por encontro).", cor: "#9d2824", icone: "♥" },
-    evento: { nome: "Evento institucional", desc: "Frequência em eventos (até 700 Savacoins no bimestre).", cor: "#3a3c39", icone: "◆" },
-    avaliacao: { nome: "Avaliação do líder", desc: "Técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: "★" },
-    indicacao: { nome: "Indicação de negócio", desc: "Informada pelos sócios — 500 Savacoins (ADV).", cor: "#2f7a5b", icone: "↗" },
-    missao: { nome: "Missão secreta", desc: "Missões divulgadas previamente pelo RH.", cor: "#7c2ba8", icone: "✦" },
-    protagonista: { nome: "Selo Sou Protagonista", desc: "Indicação do líder por inovação, melhoria ou inspiração.", cor: "#b08a3e", icone: "◎" },
+    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros (575 Savacoins por encontro).", cor: "#9d2824", icone: ico("felicidade") },
+    evento: { nome: "Evento institucional", desc: "Frequência em eventos (até 700 Savacoins no bimestre).", cor: "#3a3c39", icone: ico("evento") },
+    avaliacao: { nome: "Avaliação do líder", desc: "Técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
+    indicacao: { nome: "Indicação de negócio", desc: "Informada pelos sócios — 500 Savacoins (ADV).", cor: "#2f7a5b", icone: ico("indicacao") },
+    missao: { nome: "Missão secreta", desc: "Missões divulgadas previamente pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
+    protagonista: { nome: "Selo Sou Protagonista", desc: "Indicação do líder por inovação, melhoria ou inspiração.", cor: "#b08a3e", icone: ico("protagonista") },
   };
 
   const pilares = [
@@ -32,7 +55,7 @@
   ];
 
   const views = {
-    visao: { nome: "Visão geral", kicker: "Acompanhamento em tempo real", render: renderVisao },
+    visao: { nome: "Visão geral", kicker: "Acompanhamento da Jornada", render: renderVisao },
     painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel },
     lancar: { nome: "Novo lançamento", kicker: "Registrar pontuação", render: renderLancar },
     historico: { nome: "Lançamentos", kicker: "Histórico do ano", render: renderHistorico },
@@ -69,15 +92,30 @@
   function montarShell() {
     const u = state.usuario;
     $("#sideUser").innerHTML = `
-      <span class="avatar">${esc(iniciais(u.nome))}</span>
-      <div><strong>${esc(u.nome)}</strong><small>${perfis[u.perfil].nome}</small></div>
-      <button class="link-btn" type="button" id="trocarSenhaBtn" title="Alterar senha">Senha</button>`;
-    $("#trocarSenhaBtn").addEventListener("click", () => abrirTrocaSenha(false));
+      <span class="avatar" title="${esc(u.nome)}">${esc(iniciais(u.nome))}</span>
+      <div class="side-label"><strong>${esc(u.nome)}</strong><small>${perfis[u.perfil].nome}</small></div>`;
 
     $("#sideNav").innerHTML = Object.entries(views)
       .filter(([id]) => podeVer(id))
-      .map(([id, v]) => `<button type="button" data-view="${id}">${v.nome}</button>`)
+      .map(([id, v]) => `<button type="button" data-view="${id}" title="${v.nome}">${ico(id)}<span class="side-label">${v.nome}</span></button>`)
       .join("");
+
+    $("#sideFoot").innerHTML = `
+      <button type="button" id="temaBtn" role="switch">${ico("lua")}<span class="side-label">Tema escuro</span><span class="mini-switch" aria-hidden="true"></span></button>
+      <button type="button" id="trocarSenhaBtn" title="Alterar senha">${ico("senha")}<span class="side-label">Alterar senha</span></button>
+      <a href="index.html" title="Ver site da Jornada">${ico("site")}<span class="side-label">Ver site da Jornada</span></a>
+      <button type="button" id="logoutBtn" title="Sair">${ico("sair")}<span class="side-label">Sair</span></button>`;
+    $("#trocarSenhaBtn").addEventListener("click", () => abrirTrocaSenha(false));
+    $("#temaBtn").addEventListener("click", () => aplicarTema(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
+    aplicarTema(document.documentElement.dataset.theme || "light");
+
+    $("#collapseBtn").innerHTML = ico("recolher");
+    $("#collapseBtn").addEventListener("click", () => {
+      const recolhida = document.documentElement.classList.toggle("side-collapsed");
+      try { localStorage.setItem("jornada-sava-lateral", recolhida ? "recolhida" : "aberta"); } catch (e) {}
+      atualizarRecolher();
+    });
+    atualizarRecolher();
     $("#sideNav").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-view]");
       if (!btn) return;
@@ -96,9 +134,27 @@
       if ($("#modal").classList.contains("open") && !$("#modal").dataset.locked) fecharModal();
       fecharDrawer();
     });
+  }
 
-    const bim = R.bimestreDaData(hojeIso());
-    $("#bimestreChip").textContent = bim ? `${bim.nome} · premiação em ${bim.premiacao.toLowerCase()}` : "Período sem pontuação";
+  // Um só tema para todas as páginas do sistema, inclusive o painel (que roda num iframe).
+  function aplicarTema(tema) {
+    document.documentElement.dataset.theme = tema;
+    try { localStorage.setItem("jornada-sava-theme", tema); } catch (e) {}
+    const escuro = tema === "dark";
+    const btn = $("#temaBtn");
+    btn.setAttribute("aria-checked", String(escuro));
+    btn.title = escuro ? "Mudar para o tema claro" : "Mudar para o tema escuro";
+    btn.querySelector(".ico").outerHTML = ico(escuro ? "sol" : "lua");
+    const painel = $("#painelFrame")?.contentWindow;
+    if (painel && typeof painel.setTheme === "function") painel.setTheme(tema);
+  }
+
+  function atualizarRecolher() {
+    const recolhida = document.documentElement.classList.contains("side-collapsed");
+    const btn = $("#collapseBtn");
+    btn.setAttribute("aria-expanded", String(!recolhida));
+    btn.title = recolhida ? "Expandir menu" : "Recolher menu";
+    btn.setAttribute("aria-label", btn.title);
   }
 
   function irPara(view, extra = {}) {
@@ -367,8 +423,8 @@
       <section class="type-picker">
         ${permitidos
           .map(
-            (t) => `<button type="button" class="type-card ${t === state.tipoLancamento ? "active" : ""}" data-tipo="${t}" style="--c:${tipos[t].cor}">
-              <span class="type-dot">${tipos[t].icone}</span><strong>${tipos[t].nome}</strong><small>${tipos[t].desc}</small></button>`,
+            (t) => `<button type="button" class="type-card ${t === state.tipoLancamento ? "active" : ""}" data-tipo="${t}" style="--c:${tipos[t].cor}" aria-pressed="${t === state.tipoLancamento}">
+              <span class="type-icon">${tipos[t].icone}</span><span class="type-check" aria-hidden="true"></span><strong>${tipos[t].nome}</strong><small>${tipos[t].desc}</small></button>`,
           )
           .join("")}
       </section>
