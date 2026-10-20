@@ -124,6 +124,37 @@
     return ganhos;
   }
 
+  // Pontos que um lançamento gera para cada pessoa, separados por pilar.
+  // "resumo" é a forma já calculada que o servidor entrega para a homepage pública (sem notas nem textos).
+  function pontosDoLancamento(l, pessoaId) {
+    const vazio = { felicidade: 0, eventos: 0, tecnica: 0, socio: 0, competencias: 0, extras: 0, selos: [] };
+    if (l.pessoaIds && !l.pessoaIds.includes(pessoaId)) return vazio;
+    if (l.pessoaId && l.pessoaId !== pessoaId) return vazio;
+
+    switch (l.tipo) {
+      case "resumo":
+        return { ...vazio, ...l.resumo };
+      case "felicidade":
+        return { ...vazio, felicidade: Number(l.pontos) };
+      case "evento":
+        return { ...vazio, eventos: Number(l.pontos) };
+      case "indicacao":
+      case "missao":
+        return { ...vazio, extras: Number(l.pontos) };
+      case "protagonista":
+        return { ...vazio, selos: ["protagonista"] };
+      case "avaliacao": {
+        const soma = (grupo) =>
+          criterios[l.categoria].filter((c) => c.grupo === grupo).reduce((t, c) => t + Number(l.notas[c.id] || 0), 0);
+        const selos = selosDaAvaliacao(l.categoria, l.notas);
+        if (l.categoria === "adv") return { ...vazio, competencias: soma("tecnica") + soma("socio"), selos };
+        return { ...vazio, tecnica: soma("tecnica"), socio: soma("socio"), selos };
+      }
+      default:
+        return vazio;
+    }
+  }
+
   window.SAVA_REGRAS = {
     anoAtual: 2026,
     pontosPorEncontroFelicidade: 575,
@@ -149,5 +180,6 @@
     nivelPorPontos,
     proximoNivel,
     selosDaAvaliacao,
+    pontosDoLancamento,
   };
 })();

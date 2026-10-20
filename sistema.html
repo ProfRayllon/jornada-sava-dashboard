@@ -9,13 +9,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/sistema.css" />
-    <script>
-      // Redireciona antes de pintar a página quando não há sessão.
-      try {
-        const s = JSON.parse(sessionStorage.getItem("sava.v1.sessao") || "null");
-        if (!s || s.expira < Date.now()) location.replace("login.html");
-      } catch { location.replace("login.html"); }
-    </script>
     <script src="base/dados-painel.js" defer></script>
     <script src="assets/js/regras.js" defer></script>
     <script src="assets/js/store.js" defer></script>

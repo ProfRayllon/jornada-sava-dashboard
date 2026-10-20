@@ -3,8 +3,7 @@
 # ------------------------------------------------------------
 
 # Base de dados (nomes, notas, feedbacks e planilhas da jornada).
-# Por enquanto só a base tratada do painel vai para o repositório, porque o GitHub Pages
-# precisa dela para funcionar. Na migração para a VPS/PostgreSQL, ela também sai daqui.
+# Só a base tratada do painel vai para o repositório: o site e o painel usam ela.
 base/*
 !base/dados-painel.js
 !base/dados-painel.json
@@ -13,7 +12,7 @@ base/*
 # Documentos internos (orientação do programa, referências de layout).
 docs/
 
-# Variáveis de ambiente e credenciais (para quando houver backend).
+# Variáveis de ambiente e credenciais.
 .env
 .env.*
 !.env.example
@@ -34,3 +33,7 @@ Thumbs.db
 desktop.ini
 .vscode/
 .idea/
+
+# Backend
+server/node_modules/
+backups/

@@ -43,9 +43,12 @@
     return dados;
   }
 
-  window.JORNADA_SAVA_PANEL_DATA = montar();
+  // painel.js espera esta promessa antes de ler JORNADA_SAVA_PANEL_DATA.
+  window.SAVA_PAINEL_PRONTO = S.garantirDb()
+    .then(() => (window.JORNADA_SAVA_PANEL_DATA = montar()))
+    .catch(() => {});
 
-  // Tempo real: quando o sistema grava algo (outra aba/janela), o painel se atualiza sozinho.
+  // Tempo real: quando alguém grava algo no sistema, o painel se atualiza sozinho.
   S.ouvir(async () => {
     window.JORNADA_SAVA_PANEL_DATA = montar();
     if (typeof loadAllWorkbooks !== "function" || typeof render !== "function") return;

@@ -112,7 +112,13 @@ img { max-width: 100%; }
 /* ============ Login ============ */
 .login-back { justify-self: center; color: var(--muted); font-size: 0.78rem; font-weight: 600; text-decoration: none; }
 .login-back:hover { color: var(--gold-deep); }
-.login-form-wrap { display: grid; place-items: center; min-height: 100vh; padding: 40px 24px; background: var(--surface); }
+.login-form-wrap {
+  display: grid;
+  place-items: center end;
+  min-height: 100vh;
+  padding: 40px clamp(24px, 16vw, 300px) 40px 24px;
+  background: #f7f2ea url("../img/login-fundo.jpg") left center / cover no-repeat;
+}
 .login-form { display: grid; gap: 16px; width: min(380px, 100%); }
 .login-logo { width: 200px; margin-bottom: 18px; }
 .login-form h2 { font-size: 1.5rem; font-weight: 700; }
@@ -387,6 +393,8 @@ img { max-width: 100%; }
   .kpis { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 900px) {
+  .login-form-wrap { place-items: center; padding: 40px 16px; }
+  .login-form { padding: 28px 22px; border-radius: 14px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(6px); }
   .app { grid-template-columns: 1fr; }
   .sidebar { position: fixed; z-index: 80; left: 0; width: 270px; transform: translateX(-100%); transition: transform 0.3s ease; }
   body.nav-open .sidebar { transform: none; box-shadow: 20px 0 50px rgba(0, 0, 0, 0.3); }

@@ -27,7 +27,6 @@
   document.addEventListener("DOMContentLoaded", () => {
     $$("[data-ano-atual]").forEach((el) => (el.textContent = R.anoAtual));
     iniciarHeader();
-    montarNumeros();
     montarFluxo();
     montarPontuacao();
     montarIndicadores();
@@ -35,8 +34,14 @@
     montarExcelencia();
     montarPesos();
     montarNiveis();
-    montarHall();
     iniciarReveal();
+    // Números e hall da fama somam os lançamentos do sistema; sem servidor, usam só a base.
+    Promise.resolve(S?.garantirDb())
+      .catch(() => {})
+      .finally(() => {
+        montarNumeros();
+        montarHall();
+      });
   });
 
   // ---------- Header ----------

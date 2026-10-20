@@ -1,0 +1,53 @@
+# Jornada SAVA na VPS: PostgreSQL + aplicação + Caddy (HTTPS automático com Let's Encrypt).
+# Uso: copie .env.example para .env, preencha e rode `docker compose up -d --build`.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jornada_sava
+      POSTGRES_USER: sava
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sava -d jornada_sava"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://sava:${POSTGRES_PASSWORD}@db:5432/jornada_sava
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@sava.adv.br}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?defina ADMIN_PASSWORD no .env}
+      SESSION_HOURS: ${SESSION_HOURS:-8}
+    volumes:
+      # Base tratada das planilhas (dados-painel.js/json). Atualize os arquivos na VPS sem rebuild.
+      - ./base:/app/base:ro
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?defina DOMAIN no .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

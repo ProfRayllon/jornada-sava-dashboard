@@ -84,8 +84,8 @@
       irPara(btn.dataset.view);
     });
 
-    $("#logoutBtn").addEventListener("click", () => {
-      S.sair();
+    $("#logoutBtn").addEventListener("click", async () => {
+      await S.sair();
       location.replace("login.html");
     });
     $("#menuBtn").addEventListener("click", () => document.body.classList.toggle("nav-open"));
@@ -591,7 +591,11 @@
 
     if (avisos.length && !confirm(`${avisos.join("\n")}\n\nDeseja registrar mesmo assim?`)) return;
 
-    await S.registrarLancamento(dados, state.usuario);
+    try {
+      await S.registrarLancamento(dados);
+    } catch (err) {
+      return (erro.textContent = err.message);
+    }
     state.pessoaPreSelecionada = null;
     toast(`${tipos[tipo].nome} registrado. Painel atualizado.`);
     renderLancar($("#content"));
@@ -656,7 +660,11 @@
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
         if (!confirm("Excluir este lançamento? A pontuação será removida do painel.")) return;
-        await S.excluirLancamento(b.dataset.excluir);
+        try {
+          await S.excluirLancamento(b.dataset.excluir);
+        } catch (err) {
+          return toast(err.message);
+        }
         toast("Lançamento excluído.");
         renderHistorico(el);
       }),
@@ -822,8 +830,11 @@
       const fd = new FormData(e.target);
       if (fd.get("s1").length < 6) return ($("#sfErro").textContent = "Use pelo menos 6 caracteres.");
       if (fd.get("s1") !== fd.get("s2")) return ($("#sfErro").textContent = "As senhas não conferem.");
-      const u = state.usuario;
-      await S.salvarUsuario({ ...u, senha: fd.get("s1"), trocarSenha: false });
+      try {
+        await S.trocarSenha(fd.get("s1"));
+      } catch (err) {
+        return ($("#sfErro").textContent = err.message);
+      }
       state.usuario = S.usuarioAtual();
       fecharModal();
       toast("Senha atualizada.");

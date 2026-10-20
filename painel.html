@@ -7,12 +7,9 @@
     <link rel="icon" href="favicon.ico" />
     <link rel="stylesheet" href="assets/css/painel.css" />
     <script>
-      // O painel faz parte do sistema: só abre com sessão ativa.
-      try {
-        const s = JSON.parse(sessionStorage.getItem("sava.v1.sessao") || "null");
-        if (!s || s.expira < Date.now()) (window.top || window).location.replace("login.html");
-        else if (window.top === window) location.replace("sistema.html#painel");
-      } catch { location.replace("login.html"); }
+      // O painel faz parte do sistema: o servidor só entrega esta página com sessão ativa,
+      // e aberta fora do sistema ela volta para dentro dele.
+      if (window.top === window) location.replace("sistema.html#painel");
     </script>
     <script src="base/dados-painel.js" defer></script>
     <script src="base/dados-jornada.js" defer></script>

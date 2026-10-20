@@ -153,6 +153,7 @@ async function init() {
   bindEvents();
   restorePreferences();
   restoreYearFromUrl();
+  await window.SAVA_PAINEL_PRONTO;
   await loadAllWorkbooks();
   render();
 }

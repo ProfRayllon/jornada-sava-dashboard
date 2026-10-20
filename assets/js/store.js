@@ -1,22 +1,21 @@
 // Camada de dados da Jornada SAVA.
-// Versão inicial: persiste no localStorage do navegador. Toda leitura/escrita passa por
-// SAVA_STORE, para que a troca por um backend compartilhado (ex.: Supabase) fique isolada aqui.
+// Os dados ficam no PostgreSQL, atrás da API em /api (pasta server/). Este arquivo mantém uma cópia
+// em memória do estado, para que as telas continuem lendo de forma síncrona; toda escrita vai para a
+// API e, em seguida, o estado é recarregado. Mudanças feitas por outros usuários chegam por SSE.
 (function () {
   const R = window.SAVA_REGRAS;
-  const DB_KEY = "sava.v1.db";
-  const SESSION_KEY = "sava.v1.sessao";
-  const SESSION_HOURS = 8;
-  const canal = "BroadcastChannel" in window ? new BroadcastChannel("sava-db") : null;
+  const LEGADO_KEY = "sava.v1.db"; // base antiga, salva no navegador antes do PostgreSQL
   const ouvintes = new Set();
 
-  const ADMIN_PADRAO = { email: "admin@sava.adv.br", senha: "" };
+  let db = null; // { usuarios, pessoas, lancamentos, atualizadoEm }
+  let eu = null; // usuário logado (null na homepage pública)
+  let carregando = null;
+  let eventos = null;
 
   const categoriaPorRotulo = {
     "Advogados Associados": "adv",
     "Controladoria e Administrativo": "adm",
   };
-
-  const uid = (prefixo) => `${prefixo}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
   function normalizar(texto) {
     return String(texto || "")
@@ -35,234 +34,180 @@
     return BASE_PLANILHAS?.years?.[String(ano)] || null;
   }
 
-  async function hashSenha(senha, salt) {
-    const bytes = new TextEncoder().encode(`${salt}:${senha}`);
-    const digest = await crypto.subtle.digest("SHA-256", bytes);
-    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  }
-
-  function lerDb() {
+  async function api(caminho, { metodo = "GET", corpo } = {}) {
+    let resp;
     try {
-      const bruto = localStorage.getItem(DB_KEY);
-      return bruto ? JSON.parse(bruto) : null;
+      resp = await fetch(`api/${caminho}`, {
+        method: metodo,
+        credentials: "same-origin",
+        headers: corpo ? { "Content-Type": "application/json" } : undefined,
+        body: corpo ? JSON.stringify(corpo) : undefined,
+      });
     } catch {
-      return null;
+      throw new Error("Sem conexão com o servidor. Tente novamente.");
     }
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const erro = new Error(json.erro || "Não foi possível concluir a operação.");
+      erro.status = resp.status;
+      throw erro;
+    }
+    return json;
   }
 
-  function gravarDb(db) {
-    db.atualizadoEm = new Date().toISOString();
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-    canal?.postMessage({ tipo: "db-atualizado" });
-    ouvintes.forEach((fn) => fn());
-  }
-
-  async function garantirDb() {
-    let db = lerDb();
-    if (db) return db;
-
-    const salt = uid("s");
-    db = {
-      versao: 1,
-      criadoEm: new Date().toISOString(),
-      usuarios: [
-        {
-          id: uid("u"),
-          nome: "Administrador",
-          email: ADMIN_PADRAO.email,
-          perfil: "admin",
-          salt,
-          senhaHash: await hashSenha(ADMIN_PADRAO.senha, salt),
-          ativo: true,
-          trocarSenha: true,
-          criadoEm: new Date().toISOString(),
-        },
-      ],
-      pessoas: pessoasIniciais(),
-      lancamentos: [],
-    };
-    gravarDb(db);
+  async function recarregar() {
+    let estado;
+    try {
+      estado = await api("estado");
+    } catch (err) {
+      if (err.status !== 401) throw err;
+      estado = await api("publico");
+    }
+    eu = estado.eu || null;
+    db = { usuarios: estado.usuarios || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
-  // Importa as pessoas da base tratada do ano atual (planilhas) como ponto de partida.
-  function pessoasIniciais() {
-    const base = dadosBase(R.anoAtual);
-    if (!base) return [];
-    return base.people.map((p) => ({
-      id: uid("p"),
-      nome: p.name,
-      chaveBase: p.key || normalizar(p.name),
-      categoria: categoriaPorRotulo[p.category] || null,
-      setor: "",
-      ativo: true,
-      origem: "base",
-      criadoEm: new Date().toISOString(),
-    }));
+  async function garantirDb() {
+    if (db) return db;
+    carregando ||= recarregar().finally(() => (carregando = null));
+    await carregando;
+    if (eu) iniciarTempoReal();
+    if (eu?.perfil === "admin") await migrarBaseDoNavegador();
+    return db;
+  }
+
+  function lerDb() {
+    return db;
+  }
+
+  async function aposEscrita() {
+    await recarregar();
+    ouvintes.forEach((fn) => fn());
+  }
+
+  // Tempo real: o servidor avisa quando qualquer usuário grava algo.
+  function iniciarTempoReal() {
+    if (eventos || !("EventSource" in window)) return;
+    eventos = new EventSource("api/eventos");
+    eventos.addEventListener("atualizado", async () => {
+      try {
+        await recarregar();
+      } catch {
+        return;
+      }
+      ouvintes.forEach((fn) => fn());
+    });
   }
 
   function ouvir(fn) {
     ouvintes.add(fn);
-    canal?.addEventListener("message", fn);
-    window.addEventListener("storage", (e) => {
-      if (e.key === DB_KEY) fn();
-    });
+  }
+
+  // Leva para o PostgreSQL o que foi registrado quando os dados ficavam no navegador.
+  async function migrarBaseDoNavegador() {
+    let legado;
+    try {
+      legado = JSON.parse(localStorage.getItem(LEGADO_KEY) || "null");
+    } catch {
+      return;
+    }
+    if (!legado?.lancamentos?.length && !legado?.usuarios?.length) return;
+    if (db.lancamentos.length) return; // o servidor já tem dados: não mistura bases
+    const msg = `Encontramos ${legado.lancamentos.length} lançamento(s) e ${legado.usuarios.length} acesso(s) salvos neste navegador, de antes do banco de dados.\n\nDeseja enviar esses dados para o servidor agora?`;
+    if (!confirm(msg)) return;
+    try {
+      await api("importar", { metodo: "POST", corpo: legado });
+      localStorage.removeItem(LEGADO_KEY);
+      await recarregar();
+      alert("Dados enviados para o servidor.");
+    } catch (err) {
+      alert(`Não foi possível importar: ${err.message}`);
+    }
   }
 
   // ---------- Sessão ----------
   async function entrar(email, senha) {
-    const db = await garantirDb();
-    const usuario = db.usuarios.find((u) => u.email.toLowerCase() === String(email).trim().toLowerCase());
-    if (!usuario || !usuario.ativo) throw new Error("Usuário ou senha inválidos.");
-    const hash = await hashSenha(senha, usuario.salt);
-    if (hash !== usuario.senhaHash) throw new Error("Usuário ou senha inválidos.");
-    sessionStorage.setItem(
-      SESSION_KEY,
-      JSON.stringify({ usuarioId: usuario.id, expira: Date.now() + SESSION_HOURS * 3600 * 1000 }),
-    );
-    return publico(usuario);
+    const { usuario } = await api("entrar", { metodo: "POST", corpo: { email, senha } });
+    db = null;
+    return usuario;
   }
 
-  function sair() {
-    sessionStorage.removeItem(SESSION_KEY);
+  async function sair() {
+    eventos?.close();
+    eventos = null;
+    try {
+      await api("sair", { metodo: "POST" });
+    } catch {}
+    db = null;
+    eu = null;
   }
 
   function usuarioAtual() {
-    try {
-      const sessao = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
-      if (!sessao || sessao.expira < Date.now()) return null;
-      const usuario = lerDb()?.usuarios.find((u) => u.id === sessao.usuarioId && u.ativo);
-      return usuario ? publico(usuario) : null;
-    } catch {
-      return null;
-    }
+    return eu;
   }
 
-  function publico(u) {
-    const { salt, senhaHash, ...resto } = u;
-    return resto;
+  async function trocarSenha(senha) {
+    await api("minha-senha", { metodo: "POST", corpo: { senha } });
+    await aposEscrita();
   }
 
   // ---------- Usuários (equipe) ----------
   function listarUsuarios() {
-    return (lerDb()?.usuarios || []).map(publico);
+    return db?.usuarios || [];
   }
 
   async function salvarUsuario(dados) {
-    const db = await garantirDb();
-    const email = dados.email.trim().toLowerCase();
-    const duplicado = db.usuarios.find((u) => u.email === email && u.id !== dados.id);
-    if (duplicado) throw new Error("Já existe um usuário com este e-mail.");
-
-    let usuario = db.usuarios.find((u) => u.id === dados.id);
-    if (!usuario) {
-      if (!dados.senha) throw new Error("Defina uma senha inicial.");
-      usuario = { id: uid("u"), criadoEm: new Date().toISOString(), ativo: true, salt: uid("s") };
-      db.usuarios.push(usuario);
-    }
-    Object.assign(usuario, { nome: dados.nome.trim(), email, perfil: dados.perfil, area: dados.area || "" });
-    if (typeof dados.ativo === "boolean") usuario.ativo = dados.ativo;
-    if (dados.senha) {
-      usuario.senhaHash = await hashSenha(dados.senha, usuario.salt);
-      usuario.trocarSenha = Boolean(dados.trocarSenha);
-    }
-    if (!db.usuarios.some((u) => u.perfil === "admin" && u.ativo)) {
-      throw new Error("O sistema precisa de pelo menos um administrador ativo.");
-    }
-    gravarDb(db);
-    return publico(usuario);
+    const { usuario } = await api(dados.id ? `usuarios/${encodeURIComponent(dados.id)}` : "usuarios", {
+      metodo: dados.id ? "PUT" : "POST",
+      corpo: dados,
+    });
+    await aposEscrita();
+    return usuario;
   }
 
   // ---------- Pessoas avaliadas ----------
   function listarPessoas() {
-    return lerDb()?.pessoas || [];
+    return db?.pessoas || [];
   }
 
   async function salvarPessoa(dados) {
-    const db = await garantirDb();
-    let pessoa = db.pessoas.find((p) => p.id === dados.id);
-    if (!pessoa) {
-      const nome = normalizar(dados.nome);
-      if (db.pessoas.some((p) => normalizar(p.nome) === nome)) throw new Error("Esta pessoa já está cadastrada.");
-      pessoa = { id: uid("p"), origem: "sistema", ativo: true, criadoEm: new Date().toISOString() };
-      db.pessoas.push(pessoa);
-    }
-    Object.assign(pessoa, {
-      nome: dados.nome.trim().toUpperCase(),
-      categoria: dados.categoria,
-      setor: dados.setor || "",
-      ativo: dados.ativo ?? pessoa.ativo,
+    const { pessoa } = await api(dados.id ? `pessoas/${encodeURIComponent(dados.id)}` : "pessoas", {
+      metodo: dados.id ? "PUT" : "POST",
+      corpo: dados,
     });
-    gravarDb(db);
+    await aposEscrita();
     return pessoa;
   }
 
   // ---------- Lançamentos ----------
   function listarLancamentos() {
-    return lerDb()?.lancamentos || [];
+    return db?.lancamentos || [];
   }
 
-  async function registrarLancamento(dados, autor) {
-    const db = await garantirDb();
-    const bimestre = R.bimestreDaData(dados.data);
-    const lancamento = {
-      id: uid("l"),
-      ano: Number(dados.data.slice(0, 4)),
-      bimestre: bimestre?.id || null,
-      criadoEm: new Date().toISOString(),
-      autorId: autor.id,
-      autorNome: autor.nome,
-      ...dados,
-    };
-    db.lancamentos.push(lancamento);
-    gravarDb(db);
+  async function registrarLancamento(dados) {
+    const { lancamento } = await api("lancamentos", { metodo: "POST", corpo: dados });
+    await aposEscrita();
     return lancamento;
   }
 
   async function excluirLancamento(id) {
-    const db = await garantirDb();
-    db.lancamentos = db.lancamentos.filter((l) => l.id !== id);
-    gravarDb(db);
+    await api(`lancamentos/${encodeURIComponent(id)}`, { metodo: "DELETE" });
+    await aposEscrita();
   }
 
-  // Pontos que um lançamento gera para cada pessoa, separados por pilar.
-  function pontosDoLancamento(l, pessoaId) {
-    const vazio = { felicidade: 0, eventos: 0, tecnica: 0, socio: 0, competencias: 0, extras: 0, selos: [] };
-    if (l.pessoaIds && !l.pessoaIds.includes(pessoaId)) return vazio;
-    if (l.pessoaId && l.pessoaId !== pessoaId) return vazio;
-
-    switch (l.tipo) {
-      case "felicidade":
-        return { ...vazio, felicidade: Number(l.pontos) };
-      case "evento":
-        return { ...vazio, eventos: Number(l.pontos) };
-      case "indicacao":
-      case "missao":
-        return { ...vazio, extras: Number(l.pontos) };
-      case "protagonista":
-        return { ...vazio, selos: ["protagonista"] };
-      case "avaliacao": {
-        const soma = (grupo) =>
-          R.criterios[l.categoria].filter((c) => c.grupo === grupo).reduce((t, c) => t + Number(l.notas[c.id] || 0), 0);
-        const selos = R.selosDaAvaliacao(l.categoria, l.notas);
-        if (l.categoria === "adv") return { ...vazio, competencias: soma("tecnica") + soma("socio"), selos };
-        return { ...vazio, tecnica: soma("tecnica"), socio: soma("socio"), selos };
-      }
-      default:
-        return vazio;
-    }
-  }
+  const pontosDoLancamento = R.pontosDoLancamento;
 
   // Une a base importada das planilhas com os lançamentos do sistema para um ano.
   function calcularAno(ano) {
-    const db = lerDb() || { pessoas: [], lancamentos: [] };
+    const dados = db || { pessoas: [], lancamentos: [] };
     const base = dadosBase(ano);
     const basePorChave = new Map((base?.people || []).map((p) => [p.key || normalizar(p.name), p]));
-    const lancamentos = db.lancamentos.filter((l) => l.ano === Number(ano));
+    const lancamentos = dados.lancamentos.filter((l) => l.ano === Number(ano));
     const pilares = ["felicidade", "eventos", "tecnica", "socio", "competencias", "extras"];
 
-    const pessoas = db.pessoas.length
-      ? db.pessoas
+    const pessoas = dados.pessoas.length
+      ? dados.pessoas
       : (base?.people || []).map((p) => ({ id: p.key, nome: p.name, chaveBase: p.key, categoria: categoriaPorRotulo[p.category] || null, ativo: true }));
 
     return pessoas
@@ -315,7 +260,6 @@
   }
 
   window.SAVA_STORE = {
-    ADMIN_PADRAO,
     normalizar,
     garantirDb,
     lerDb,
@@ -323,6 +267,7 @@
     entrar,
     sair,
     usuarioAtual,
+    trocarSenha,
     listarUsuarios,
     salvarUsuario,
     listarPessoas,
