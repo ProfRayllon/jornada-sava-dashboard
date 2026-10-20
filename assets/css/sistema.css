@@ -110,40 +110,9 @@ img { max-width: 100%; }
 @keyframes pulse { 70% { box-shadow: 0 0 0 7px rgba(79, 209, 139, 0); } 100% { box-shadow: 0 0 0 0 rgba(79, 209, 139, 0); } }
 
 /* ============ Login ============ */
-.login-shell { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
-.login-art {
-  position: relative;
-  display: grid;
-  place-items: center;
-  padding: 48px;
-  overflow: hidden;
-  background:
-    radial-gradient(70% 60% at 30% 20%, rgba(212, 178, 111, 0.22), transparent 60%),
-    linear-gradient(160deg, #262624, #121211);
-  color: #fff;
-}
-.login-art::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(115deg, transparent 49.6%, rgba(229, 192, 124, 0.06) 50%, transparent 50.4%),
-    linear-gradient(65deg, transparent 49.6%, rgba(229, 192, 124, 0.05) 50%, transparent 50.4%);
-  background-size: 200px 200px;
-  pointer-events: none;
-}
-.login-back { position: absolute; top: 28px; left: 32px; z-index: 2; color: #d9d3c6; font-size: 0.8rem; font-weight: 600; text-decoration: none; }
-.login-back:hover { color: var(--gold-soft); }
-.login-art-inner { position: relative; z-index: 1; max-width: 440px; }
-.login-coin { width: 150px; margin-bottom: 24px; filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.5)); animation: float 6s ease-in-out infinite; }
-.login-art h1 { font-size: 2.6rem; font-weight: 800; text-transform: uppercase; margin-bottom: 14px; }
-.login-art p:not(.kicker) { color: #d9d3c6; }
-.login-seals { display: flex; gap: 14px; margin-top: 34px; }
-.login-seals img { width: 72px; filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.5)); animation: float 6s ease-in-out infinite; }
-.login-seals img:nth-child(2) { animation-delay: -2s; }
-.login-seals img:nth-child(3) { animation-delay: -4s; }
-@keyframes float { 50% { transform: translateY(-6px); } }
-.login-form-wrap { display: grid; place-items: center; padding: 40px 24px; background: var(--surface); }
+.login-back { justify-self: center; color: var(--muted); font-size: 0.78rem; font-weight: 600; text-decoration: none; }
+.login-back:hover { color: var(--gold-deep); }
+.login-form-wrap { display: grid; place-items: center; min-height: 100vh; padding: 40px 24px; background: var(--surface); }
 .login-form { display: grid; gap: 16px; width: min(380px, 100%); }
 .login-logo { width: 200px; margin-bottom: 18px; }
 .login-form h2 { font-size: 1.5rem; font-weight: 700; }
@@ -427,11 +396,6 @@ img { max-width: 100%; }
   .content { padding: 18px 16px 40px; }
   .form-grid, .criteria, .eval-summary, .roles { grid-template-columns: 1fr; }
   .options { grid-template-columns: repeat(2, 1fr); }
-  .login-shell { grid-template-columns: 1fr; }
-  .login-art { min-height: 0; padding: 72px 24px 36px; }
-  .login-coin { width: 90px; }
-  .login-art h1 { font-size: 1.8rem; }
-  .login-seals { display: none; }
   .table-wrap { margin: 0 -16px; padding: 0 16px; }
   .card { padding: 18px 16px; }
 }
