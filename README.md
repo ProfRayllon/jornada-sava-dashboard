@@ -63,7 +63,7 @@ site e a API em `/api`:
 
 Precisa de uma VPS Linux (Ubuntu 22.04/24.04, 1 GB de RAM já basta) e de um domínio.
 
-1. **DNS:** no painel do domínio, crie um registro `A` apontando o domínio (ex.: `jornada.sava.adv.br`)
+1. **DNS:** no painel do domínio, crie um registro `A` apontando o domínio (`jornadasava.com.br`)
    para o IP da VPS. Se quiser o `www.`, crie também um `A` (ou `CNAME`) para ele.
 2. **Docker na VPS** (acesse por SSH como root):
 
