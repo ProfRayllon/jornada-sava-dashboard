@@ -1,4 +1,36 @@
+# ------------------------------------------------------------
+# Jornada SAVA — o que NÃO vai para o repositório
+# ------------------------------------------------------------
+
+# Base de dados (nomes, notas, feedbacks e planilhas da jornada).
+# Por enquanto só a base tratada do painel vai para o repositório, porque o GitHub Pages
+# precisa dela para funcionar. Na migração para a VPS/PostgreSQL, ela também sai daqui.
+base/*
+!base/dados-painel.js
+!base/dados-painel.json
+!base/LEIA-ME.txt
+
+# Documentos internos (orientação do programa, referências de layout).
+docs/
+
+# Variáveis de ambiente e credenciais (para quando houver backend).
+.env
+.env.*
+!.env.example
+
+# Arquivos temporários e de trabalho
 tmp/
 ~$*.xlsx
+*.log
+
+# Python
 __pycache__/
 *.pyc
+.venv/
+
+# Sistema operacional / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

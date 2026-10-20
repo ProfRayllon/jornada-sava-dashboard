@@ -5,15 +5,17 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
+BASE = Path(__file__).resolve().parent.parent / "base"
+
 import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
 
-RAW_2026 = Path("JORNADA SAVA 2026.xlsx")
-TREATMENT_2025 = Path("Tratamneto - base 2025.xlsx")
-OUTPUT = Path("Tratamento - base 2026.xlsx")
+RAW_2026 = BASE / "planilhas" / "JORNADA SAVA 2026.xlsx"
+TREATMENT_2025 = BASE / "planilhas" / "Tratamneto - base 2025.xlsx"
+OUTPUT = BASE / "planilhas" / "Tratamento - base 2026.xlsx"
 
 ATTENDANCE_POINTS = 575
 ATTENDANCE_DATES = {

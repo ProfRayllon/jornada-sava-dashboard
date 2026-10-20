@@ -1,85 +1,67 @@
 # Jornada SAVA
 
-Dashboard estático para GitHub Pages.
+Site institucional, painel de ranking e sistema de lançamentos da Jornada SAVA — o programa de
+valorização e desenvolvimento do Sebadelhe Aranha & Vasconcelos Advocacia.
 
-## Como publicar
-
-1. Suba todos os arquivos desta pasta para o repositório.
-2. Ative o GitHub Pages apontando para a branch principal e a pasta raiz.
-3. Mantenha `dados-painel.js` na raiz. Ele é a base tratada principal carregada pelo painel.
-4. Mantenha `dados-jornada.js`, `dados-jornada.json` e as planilhas na raiz como fonte original e fallback.
-
-## Regras principais
-
-- `Rank` é a pontuação somente do ano selecionado.
-- `Total para nível` acumula o histórico quando a pessoa também participou em anos anteriores.
-- `Nível` é calculado a partir do `Total para nível`.
-- Selos zeram a cada ano.
-- A pontuação dos selos não altera o Rank; ela apenas define se a pessoa atingiu a regra do selo.
-
-## Regras dos selos
-
-### Selo Sou feliz!
-
-Concedido para quem completa as 4 datas do Programa de Felicidade do ciclo.
-
-Cada data vale `575` pontos para o selo:
+## Estrutura
 
 ```text
-575 + 575 + 575 + 575 = 2.300
+index.html          Site institucional (homepage)
+login.html          Acesso da equipe (administração, RH e líderes)
+sistema.html        Sistema: visão geral, lançamentos, colaboradores, equipe e painel
+painel.html         Painel de ranking e selos (abre dentro do sistema, exige login)
+
+assets/
+  css/              home.css · sistema.css · painel.css
+  js/
+    regras.js         Regras da jornada (critérios, pontos, níveis, selos, bimestres)
+    store.js          Camada de dados (hoje localStorage; ponto único para trocar pelo backend)
+    home.js           Interações da homepage
+    sistema.js        Telas do sistema
+    painel.js         Painel de ranking
+    painel-bridge.js  Junta a base importada com os lançamentos do sistema
+  img/              Fotos do site (capa, premiações, vencedores)
+  icones/           Ícones da interface e selos (icones/selos)
+  logo/             Logotipos
+
+scripts/            Scripts Python que tratam as planilhas e geram a base do painel
+
+base/               base de dados: dados-painel.js/json (no Git por enquanto); planilhas e
+                    respostas brutas ficam fora do Git
+docs/               (fora do Git) documentos internos e referências
 ```
 
-Para receber o selo, a pessoa precisa atingir `2.300 / 2.300`.
+## O que não vai para o repositório
 
-### Selo Mente Brilhante
+A pasta `docs/` (documentos internos) e o conteúdo de `base/` estão no `.gitignore`, com uma
+exceção temporária: `base/dados-painel.js` e `base/dados-painel.json` vão para o repositório
+enquanto o site roda no GitHub Pages. Na migração para a VPS com PostgreSQL, eles também saem.
 
-Concedido por desempenho técnico máximo.
+Sem a base, o site abre normalmente, mas sem os números e o hall da fama, e o painel fica vazio.
 
-Para Controladoria e Administrativo, a regra usa os três indicadores técnicos:
+## Rodando localmente
 
-```text
-Qualidade técnica nos serviços = 500
-Eficiência no atendimento ao cliente = 500
-Domínio de ferramentas tecnológicas = 500
-Total = 1.500
+Com Python instalado, na pasta do projeto:
+
+```powershell
+python -m http.server 8080
 ```
 
-Para Advogados Associados, a regra usa os dois indicadores técnicos na pontuação original. A régua do selo para esse perfil é `1.900`:
+Depois acesse `http://localhost:8080/`.
 
-```text
-Conhecimentos jurídicos = 950
-Proatividade estratégica = 950
-Total = 1.900
+## Atualizando a base a partir das planilhas
+
+Coloque as planilhas em `base/planilhas/` e rode:
+
+```powershell
+python scripts\build_tratamento_2026.py
+python scripts\build_dados_painel.py
 ```
 
-Para receber o selo, o advogado precisa atingir `1.900 / 1.900`. Essa regra vale apenas para o selo e não altera o Rank.
+Os arquivos `base/dados-painel.js` e `base/dados-painel.json` são gerados novamente.
 
-### Selo Eu inspiro pessoas!
+## Próximos passos
 
-Concedido por desempenho máximo nos critérios socioemocionais/relacionais.
-
-Para Controladoria e Administrativo:
-
-```text
-Proatividade = 600
-Inteligência emocional e social = 600
-Autogestão = 800
-Total = 2.000
-```
-
-Para Advogados Associados, a regra atual considera:
-
-```text
-Responsabilidade normalizada = Responsabilidade / 800 * 1000
-Relacionamentos colaborativos normalizado = Relacionamentos colaborativos / 800 * 1000
-Eu inspiro pessoas! = soma dos dois
-```
-
-Para receber o selo, o advogado precisa atingir `2.000 / 2.000` nessa régua normalizada. A normalização vale apenas para o selo e não altera o Rank.
-
-## Ajustes rápidos
-
-- Paleta e layout ficam em `styles.css`.
-- Fotos fixas dos vencedores ficam em `img/vencedor-2025.png` e `img/vencedor-2026.jpeg`.
-- Para trocar os selos, substitua os PNGs dentro de `icones_selos`.
-- Se atualizar as planilhas, rode `python scripts\build_tratamento_2026.py` e depois `python scripts\build_dados_painel.py` para gerar novamente `Tratamento - base 2026.xlsx`, `dados-painel.js` e `dados-painel.json`.
+Hoje os lançamentos do sistema ficam salvos no navegador (localStorage). O próximo passo é um
+backend com PostgreSQL, que torna os dados compartilhados entre todos os usuários. Toda leitura e
+escrita passa por `assets/js/store.js`, então a migração fica concentrada nesse arquivo.

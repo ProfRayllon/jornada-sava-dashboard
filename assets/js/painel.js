@@ -1,6 +1,6 @@
 ﻿const workbookConfigs = [
-  { year: 2026, label: "2026", file: "JORNADA SAVA 2026.xlsx" },
-  { year: 2025, label: "Resultado 2025", file: "JORNADA SAVA 2025.xlsx" },
+  { year: 2026, label: "2026", file: "base/planilhas/JORNADA SAVA 2026.xlsx" },
+  { year: 2025, label: "Resultado 2025", file: "base/planilhas/JORNADA SAVA 2025.xlsx" },
 ];
 
 const attendanceMaxByCycle = {
@@ -58,8 +58,8 @@ const levelRules = [
 ];
 
 const winnerPhotosByYear = {
-  2025: "img/vencedor-2025.png",
-  2026: "img/vencedor-2026.jpeg",
+  2025: "assets/img/vencedores/2025.png",
+  2026: "assets/img/vencedores/2026.jpeg",
 };
 
 const badgeDefinitions = [
@@ -67,7 +67,7 @@ const badgeDefinitions = [
     id: "happy",
     label: "Sou feliz!",
     short: "Feliz",
-    image: "icones_selos/1.png",
+    image: "assets/icones/selos/1.png",
     className: "badge-happy",
     tone: "happy",
     description: "Reconhece quem espalha alegria, bom humor e energia positiva por onde passa.",
@@ -76,7 +76,7 @@ const badgeDefinitions = [
     id: "bright",
     label: "Mente brilhante",
     short: "Técnica",
-    image: "icones_selos/2.png",
+    image: "assets/icones/selos/2.png",
     className: "badge-bright",
     tone: "bright",
     description: "Reconhece o pensamento crítico, a inovação e as ideias que impulsionam resultados.",
@@ -85,7 +85,7 @@ const badgeDefinitions = [
     id: "inspire",
     label: "Eu inspiro pessoas!",
     short: "Inspira",
-    image: "icones_selos/3.png",
+    image: "assets/icones/selos/3.png",
     className: "badge-inspire",
     tone: "inspire",
     description: "Reconhece quem motiva, desenvolve e deixa um impacto positivo nas pessoas.",
@@ -99,7 +99,7 @@ const state = {
   search: "",
   category: "all",
   level: "all",
-  rankSort: null,
+  rankSort: "desc",
   experienceSort: null,
   badgesExpanded: false,
   activeBadgeId: null,
@@ -273,7 +273,7 @@ function bindEvents() {
 }
 
 function getDefaultWinnerPhoto(year) {
-  return winnerPhotosByYear[Number(year)] || "Logo - Copia.png";
+  return winnerPhotosByYear[Number(year)] || "assets/logo/sava-simbolo.png";
 }
 
 function restorePreferences() {
@@ -291,7 +291,7 @@ function setFiltersHidden(hidden) {
 function updateNamesToggleButton() {
   const privacy = state.namesPrivacy;
   const awaitingRevealAll = privacy.active && !privacy.othersRevealed;
-  els.namesToggleIcon.src = awaitingRevealAll ? "icones/view.png" : "icones/hide.png";
+  els.namesToggleIcon.src = awaitingRevealAll ? "assets/icones/view.png" : "assets/icones/hide.png";
   els.namesToggle.setAttribute("aria-pressed", String(privacy.active));
   els.namesToggle.title = awaitingRevealAll
     ? "Revelar todos (exceto o 1º lugar)"
@@ -351,7 +351,7 @@ async function loadProcessedData() {
   if (window.JORNADA_SAVA_PANEL_DATA?.years) return window.JORNADA_SAVA_PANEL_DATA;
 
   try {
-    const response = await fetch("dados-painel.json", { cache: "no-store" });
+    const response = await fetch("base/dados-painel.json", { cache: "no-store" });
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -419,7 +419,7 @@ async function loadJsonData() {
   if (window.JORNADA_SAVA_DATA?.workbooks) return window.JORNADA_SAVA_DATA;
 
   try {
-    const response = await fetch("dados-jornada.json", { cache: "no-store" });
+    const response = await fetch("base/dados-jornada.json", { cache: "no-store" });
     if (!response.ok) return null;
     return await response.json();
   } catch {
@@ -818,7 +818,7 @@ function renderRanking() {
       const nameCellMarkup = championHidden
         ? `
           <button type="button" class="champion-reveal-btn" data-reveal-champion>
-            <img src="icones/trofeu.png" alt="" aria-hidden="true" />
+            <img src="assets/icones/trofeu.png" alt="" aria-hidden="true" />
             Revelar campeão
           </button>
         `
@@ -957,7 +957,7 @@ function renderBadgeModal() {
   const countLabel = people.length === 1 ? "pessoa neste selo" : "pessoas neste selo";
 
   els.badgeModalFeature.innerHTML = `
-    <img class="modal-brand" src="Logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
+    <img class="modal-brand" src="assets/logo/sava-logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
     <div class="modal-seal-wrap modal-seal-${badge.tone}">
       <span class="modal-beam modal-beam-one" aria-hidden="true"></span>
       <span class="modal-beam modal-beam-two" aria-hidden="true"></span>

@@ -1,0 +1,10 @@
+Pasta da base de dados da Jornada SAVA (NÃO vai para o Git — ver .gitignore).
+
+Conteúdo esperado:
+  dados-painel.js / dados-painel.json   -> base tratada que alimenta site, painel e sistema
+  dados-jornada.js / dados-jornada.json -> respostas brutas do formulário (fallback do painel)
+  planilhas/                            -> planilhas originais e tratadas (2025, 2026)
+
+Para gerar novamente a base tratada:
+  python scripts/build_tratamento_2026.py
+  python scripts/build_dados_painel.py

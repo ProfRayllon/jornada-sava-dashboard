@@ -5,11 +5,13 @@ import unicodedata
 from datetime import date, datetime
 from pathlib import Path
 
+BASE = Path(__file__).resolve().parent.parent / "base"
+
 import pandas as pd
 
 
-ROOT_2025_TREATMENT = Path("Tratamneto - base 2025.xlsx")
-ROOT_2026_TREATMENT = Path("Tratamento - base 2026.xlsx")
+ROOT_2025_TREATMENT = BASE / "planilhas" / "Tratamneto - base 2025.xlsx"
+ROOT_2026_TREATMENT = BASE / "planilhas" / "Tratamento - base 2026.xlsx"
 
 PF_POINTS = 575
 
@@ -289,9 +291,9 @@ def main():
         "generatedAt": datetime.now().isoformat(timespec="seconds"),
         "years": {"2025": process_2025(), "2026": process_2026()},
     }
-    with open("dados-painel.json", "w", encoding="utf-8") as file:
+    with open(BASE / "dados-painel.json", "w", encoding="utf-8") as file:
         json.dump(data, file, ensure_ascii=False, indent=2, default=fmt_date)
-    with open("dados-painel.js", "w", encoding="utf-8") as file:
+    with open(BASE / "dados-painel.js", "w", encoding="utf-8") as file:
         file.write("window.JORNADA_SAVA_PANEL_DATA = ")
         json.dump(data, file, ensure_ascii=False, separators=(",", ":"), default=fmt_date)
         file.write(";\n")

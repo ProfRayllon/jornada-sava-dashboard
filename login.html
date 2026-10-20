@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Entrar · Jornada SAVA</title>
+    <link rel="icon" href="favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/sistema.css" />
+    <script src="base/dados-painel.js" defer></script>
+    <script src="assets/js/regras.js" defer></script>
+    <script src="assets/js/store.js" defer></script>
+  </head>
+  <body class="login-page">
+    <main class="login-shell">
+      <section class="login-art" aria-hidden="true">
+        <a class="login-back" href="index.html">← Voltar ao site</a>
+        <div class="login-art-inner">
+          <img class="login-coin" src="assets/icones/savacoins.png" alt="" />
+          <p class="kicker kicker-light">Área da equipe</p>
+          <h1>Jornada SAVA</h1>
+          <p>Registre presenças, avaliações e conquistas. O painel da jornada é atualizado automaticamente a cada lançamento.</p>
+          <div class="login-seals">
+            <img src="assets/icones/selos/1.png" alt="" />
+            <img src="assets/icones/selos/2.png" alt="" />
+            <img src="assets/icones/selos/3.png" alt="" />
+          </div>
+        </div>
+      </section>
+
+      <section class="login-form-wrap">
+        <form class="login-form" id="loginForm" novalidate>
+          <img class="login-logo" src="assets/logo/sava-logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
+          <h2>Acesse sua conta</h2>
+          <p class="muted">Uso exclusivo da administração, RH e líderes avaliadores.</p>
+
+          <label class="field">
+            <span>E-mail</span>
+            <input type="email" name="email" autocomplete="username" required placeholder="nome@sava.adv.br" />
+          </label>
+          <label class="field">
+            <span>Senha</span>
+            <input type="password" name="senha" autocomplete="current-password" required placeholder="••••••••" />
+          </label>
+
+          <p class="form-error" id="loginError" role="alert"></p>
+
+          <button class="btn btn-gold btn-block" type="submit">Entrar</button>
+          <p class="login-help">Não tem acesso? Solicite ao administrador da Jornada SAVA.</p>
+        </form>
+      </section>
+    </main>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", async () => {
+        await SAVA_STORE.garantirDb();
+        if (SAVA_STORE.usuarioAtual()) location.replace("sistema.html");
+
+        const form = document.getElementById("loginForm");
+        const erro = document.getElementById("loginError");
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          erro.textContent = "";
+          const dados = new FormData(form);
+          try {
+            await SAVA_STORE.entrar(dados.get("email"), dados.get("senha"));
+            location.replace("sistema.html");
+          } catch (err) {
+            erro.textContent = err.message;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

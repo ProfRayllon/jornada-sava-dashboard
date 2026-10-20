@@ -3,200 +3,299 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Jornada SAVA</title>
+    <title>Jornada SAVA · Valorização dos nossos talentos</title>
+    <meta name="description" content="Jornada SAVA: o programa de valorização e desenvolvimento do Sebadelhe Aranha & Vasconcelos Advocacia." />
     <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="styles.css" />
-    <script src="dados-painel.js" defer></script>
-    <script src="dados-jornada.js" defer></script>
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-    <script src="app.js" defer></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/home.css" />
+    <script src="base/dados-painel.js" defer></script>
+    <script src="assets/js/regras.js" defer></script>
+    <script src="assets/js/store.js" defer></script>
+    <script src="assets/js/home.js" defer></script>
   </head>
   <body>
-    <div class="app-shell">
-      <header class="topbar">
-        <div class="brand-lockup">
-          <img src="Logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
-        </div>
-        <div class="header-copy">
-          <h1>Jornada SAVA</h1>
-          <p>Fortalecendo a valorização, o engajamento e o desenvolvimento dos nossos talentos</p>
-        </div>
-        <div class="header-actions" aria-label="Ações do painel">
-          <button class="icon-action" id="namesToggle" type="button" aria-label="Ocultar ou revelar nomes do ranking" title="Ocultar nomes" aria-pressed="false">
-            <img src="icones/hide.png" alt="" id="namesToggleIcon" />
+    <!-- Ícones de traço (24px, stroke 1.5) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-coins" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10.5"/><path d="M12 4.6v14.8M15.3 8.6c-.55-1.25-1.75-2-3.3-2-1.95 0-3.35 1.1-3.35 2.6 0 3.75 6.95 2.1 6.95 5.75 0 1.6-1.5 2.8-3.6 2.8-1.75 0-3.1-.85-3.65-2.15"/></symbol>
+        <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/></symbol>
+        <symbol id="i-star" viewBox="0 0 24 24"><path d="M11.53 2.3a.53.53 0 0 1 .94 0l2.31 4.68a2.12 2.12 0 0 0 1.6 1.16l5.17.76a.53.53 0 0 1 .29.9l-3.74 3.64a2.12 2.12 0 0 0-.61 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.12 2.12 0 0 0-1.97 0L6.4 21.01a.53.53 0 0 1-.77-.56l.88-5.14a2.12 2.12 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .29-.91l5.17-.75a2.12 2.12 0 0 0 1.6-1.16Z"/></symbol>
+        <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7M7.5 8a2.5 2.5 0 0 1 0-5C9.5 3 11 5 12 8c1-3 2.5-5 4.5-5a2.5 2.5 0 0 1 0 5"/></symbol>
+        <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></symbol>
+        <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 3v18h18M18 17V9M13 17V5M8 17v-3"/></symbol>
+        <symbol id="i-trending" viewBox="0 0 24 24"><path d="M22 7 13.5 15.5l-5-5L2 17M16 7h6v6"/></symbol>
+        <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+        <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+        <symbol id="i-briefcase" viewBox="0 0 24 24"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect x="2" y="6" width="20" height="14" rx="2"/></symbol>
+        <symbol id="i-scale" viewBox="0 0 24 24"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM2 16l3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1ZM7 21h10M12 3v18M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></symbol>
+        <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94Z"/></symbol>
+        <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 14l2 2 4-4"/></symbol>
+        <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5M3 12a9 3 0 0 0 18 0"/></symbol>
+        <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14v-3ZM11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+        <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+        <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.13-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.13a.5.5 0 0 1 .96 0l1.58 6.13a2 2 0 0 0 1.44 1.44l6.13 1.58a.5.5 0 0 1 0 .96l-6.13 1.58a2 2 0 0 0-1.44 1.44l-1.58 6.13a.5.5 0 0 1-.96 0ZM20 3v4M22 5h-4"/></symbol>
+        <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+        <symbol id="i-plane" viewBox="0 0 24 24"><path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2Z"/></symbol>
+        <symbol id="i-bed" viewBox="0 0 24 24"><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/></symbol>
+        <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-1.8 5.41a2 2 0 0 1-1.27 1.27L7.76 16.24l1.8-5.41a2 2 0 0 1 1.27-1.27Z"/></symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1Z"/></symbol>
+        <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9ZM11 3 8 9l4 13 4-13-3-6M2 9h20"/></symbol>
+        <symbol id="i-crown" viewBox="0 0 24 24"><path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.27-3.67a.5.5 0 0 1 .8.52l-2.83 10.25a1 1 0 0 1-.96.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.27 3.67a1 1 0 0 0 1.52-.3ZM5 21h14"/></symbol>
+        <symbol id="i-lock" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+        <symbol id="i-list" viewBox="0 0 24 24"><path d="M10 12h11M10 18h11M10 6h11M4 10h2M4 6h1v4M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></symbol>
+        <symbol id="i-arrow-r" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+        <symbol id="i-chev-l" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+        <symbol id="i-chev-r" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+        <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 5-5.54 10.19-7.4 11.8a1 1 0 0 1-1.2 0C9.54 20.19 4 15 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      </defs>
+    </svg>
+
+    <header class="site-header" id="siteHeader">
+      <div class="container header-row">
+        <a class="brand" href="#inicio" aria-label="Jornada SAVA — início">
+          <img src="assets/logo/sava-simbolo.png" alt="" />
+          <span><small>Jornada</small>SAVA</span>
+        </a>
+        <nav class="main-nav" id="mainNav" aria-label="Navegação principal">
+          <a href="#inicio">Início</a>
+          <a href="#sobre">Sobre</a>
+          <a href="#como-funciona">Como funciona</a>
+          <a href="#pontuacao">Pontuação</a>
+          <a href="#conquistas">Conquistas</a>
+          <a href="#premiacoes">Premiações</a>
+          <a href="#niveis">Níveis</a>
+          <a href="#vencedores">Vencedores</a>
+          <a class="btn btn-gold nav-login-mobile" href="login.html">Entrar</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-gold btn-sm" href="login.html"><svg class="ico" aria-hidden="true"><use href="#i-user" /></svg>Entrar</a>
+          <button class="menu-toggle" id="menuToggle" type="button" aria-label="Abrir menu" aria-expanded="false" aria-controls="mainNav">
+            <svg class="ico" aria-hidden="true"><use href="#i-menu" /></svg>
           </button>
-          <button class="icon-action" id="filterToggle" type="button" aria-label="Mostrar ou ocultar filtros" title="Mostrar/ocultar filtros" aria-pressed="false">
-            <img src="icones/filter.png" alt="" />
-          </button>
-          <button class="theme-switch" id="themeToggle" type="button" aria-label="Alternar tema" title="Alternar tema">
-            <span class="switch-icon switch-sun" aria-hidden="true">
-              <img src="icones/sun.png" alt="" />
-            </span>
-            <span class="switch-icon switch-moon" aria-hidden="true">
-              <img src="icones/moon.png" alt="" />
-            </span>
-            <span class="switch-knob" aria-hidden="true"></span>
-          </button>
         </div>
-      </header>
+      </div>
+    </header>
 
-      <main>
-        <section class="control-strip" id="controlStrip" aria-label="Filtros do painel">
-          <div class="segmented-control" role="tablist" aria-label="Ano">
-            <button class="segment active" type="button" data-year="2026" role="tab" aria-selected="true">2026</button>
-            <button class="segment" type="button" data-year="2025" role="tab" aria-selected="false">Resultado 2025</button>
+    <main>
+      <!-- CAPA -->
+      <section class="hero" id="inicio">
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="container hero-inner">
+          <div class="hero-copy">
+            <p class="kicker">Programa de valorização e desenvolvimento</p>
+            <h1>Fortalecendo a valorização, o engajamento e o <em>desenvolvimento dos nossos talentos.</em></h1>
+            <p class="hero-lead">A Jornada SAVA é uma estratégia gamificada que transforma desempenho, participação e protagonismo em Savacoins, selos e reconhecimento.</p>
+            <div class="hero-ctas">
+              <a class="btn btn-gold" href="#como-funciona">Como funciona</a>
+              <a class="btn btn-outline-light" href="#premiacoes">Ver premiações</a>
+            </div>
+            <ul class="hero-features">
+              <li><span><svg class="ico" aria-hidden="true"><use href="#i-coins" /></svg></span>Pontuação<br />contínua</li>
+              <li><span><svg class="ico" aria-hidden="true"><use href="#i-chart" /></svg></span>Resultados<br />bimestrais</li>
+              <li><span><svg class="ico" aria-hidden="true"><use href="#i-trophy" /></svg></span>Reconhecimento<br />anual</li>
+            </ul>
           </div>
-
-          <label class="field">
-            <span>Buscar</span>
-            <input id="searchInput" type="search" placeholder="Nome da pessoa" />
-          </label>
-
-          <label class="field">
-            <span>Nível</span>
-            <select id="levelFilter">
-              <option value="all">Todos</option>
-              <option value="explorador">Explorador SAVA</option>
-              <option value="protagonista">Protagonista SAVA</option>
-              <option value="lider">Líder SAVA</option>
-              <option value="guardiao">Guardião SAVA</option>
-            </select>
-          </label>
-
-          <label class="field">
-            <span>Área</span>
-            <select id="categoryFilter">
-              <option value="all">Todas</option>
-              <option value="Advogados Associados">Advogados Associados</option>
-              <option value="Controladoria e Administrativo">Controladoria e Administrativo</option>
-            </select>
-          </label>
-        </section>
-
-        <section class="dashboard-grid">
-          <aside class="winner-panel" aria-label="Destaque do ano">
-            <div class="winner-shine" aria-hidden="true"></div>
-            <div class="winner-sparkles" aria-hidden="true">
-              <span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span></span><span></span>
-              <span></span><span></span><span></span><span></span><span></span>
-            </div>
-            <div class="winner-image-frame" id="winnerImageFrame">
-              <img id="winnerImage" src="Logo - Copia.png" alt="Imagem do destaque" />
-            </div>
-            <div class="winner-copy">
-              <p class="panel-kicker" id="winnerKicker">Destaque 2026</p>
-              <h2 id="winnerName">Carregando...</h2>
-              <div class="score-tile">
-                <img src="icones/trofeu.png" alt="" aria-hidden="true" />
-                <strong id="winnerScore">0</strong>
-                <small>Savacoins</small>
-              </div>
-              <p id="winnerLevel" class="winner-level">Nível acumulado</p>
-            </div>
-          </aside>
-
-          <section class="ranking-panel" aria-label="Ranking">
-            <div class="section-heading">
-              <div>
-                <p class="panel-kicker">Classificação</p>
-                <h2 id="rankingTitle">Ranking 2026</h2>
-              </div>
-              <span id="rankingCount" class="count-pill">0 pessoas</span>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Pos.</th>
-                    <th>Nome</th>
-                    <th>Área</th>
-                    <th>Nível</th>
-                    <th class="numeric sortable-heading" aria-sort="none">
-                      <button class="sort-button" id="rankSort" type="button" aria-label="Ordenar rank">
-                        <span>Rank</span>
-                        <span class="sort-arrow" aria-hidden="true"></span>
-                      </button>
-                    </th>
-                    <th class="numeric sortable-heading" aria-sort="none">
-                      <button class="sort-button" id="experienceSort" type="button" aria-label="Ordenar experiência">
-                        <span>Experiência</span>
-                        <span class="sort-arrow" aria-hidden="true"></span>
-                      </button>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody id="rankingBody"></tbody>
-              </table>
-            </div>
-          </section>
-
-        </section>
-
-        <section class="badges-panel" aria-label="Selos do ciclo">
-          <div class="section-heading compact">
-            <div>
-              <p class="panel-kicker">Reconhecimento</p>
-              <h2>Selos do ano</h2>
-              <p class="section-subtitle">Celebre conquistas que inspiram e transformam.</p>
-            </div>
-            <button class="ghost-action" id="badgesToggle" type="button">
-              Ver todos
-              <span aria-hidden="true">›</span>
-            </button>
-          </div>
-          <div id="badgesList" class="badge-list"></div>
-        </section>
-
-      </main>
-
-      <footer>
-        <span>Dados carregados das planilhas Jornada SAVA 2025 e 2026.</span>
-        <span id="lastUpdated">Atualizando...</span>
-      </footer>
-    </div>
-
-    <div class="winner-modal" id="winnerModal" aria-hidden="true">
-      <div class="winner-modal-backdrop" data-close-winner-modal></div>
-      <div class="winner-modal-confetti" id="winnerConfetti" aria-hidden="true"></div>
-      <section class="winner-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="winnerModalName">
-        <button class="modal-close" type="button" id="winnerModalClose" aria-label="Fechar celebração"></button>
-        <div class="winner-modal-photo-wrap">
-          <div class="winner-modal-rays" aria-hidden="true"></div>
-          <div class="winner-modal-glow" aria-hidden="true"></div>
-          <img id="winnerModalPhoto" src="" alt="" />
-        </div>
-        <div class="winner-modal-copy">
-          <p class="winner-modal-kicker">Campeão do ciclo</p>
-          <h2 id="winnerModalName">Nome</h2>
-          <p class="winner-modal-level" id="winnerModalLevel">Nível</p>
-          <div class="winner-modal-score">
-            <img src="icones/trofeu.png" alt="" aria-hidden="true" />
-            <strong id="winnerModalScore">0</strong>
-            <small>Savacoins</small>
-          </div>
-          <div class="winner-modal-divider" aria-hidden="true">
-            <span></span>
-            <em>✦</em>
-            <span></span>
-          </div>
-          <p class="winner-modal-subtitle">Reconhecimento máximo deste ciclo.</p>
-          <button type="button" class="winner-modal-continue" id="winnerModalContinue">Continuar</button>
         </div>
       </section>
-    </div>
 
-    <div class="badge-modal" id="badgeModal" aria-hidden="true">
-      <div class="badge-modal-backdrop" data-close-badge-modal></div>
-      <section class="badge-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="badgeModalTitle">
-        <button class="modal-close" type="button" id="badgeModalClose" aria-label="Fechar detalhes do selo">×</button>
-        <div class="modal-feature" id="badgeModalFeature"></div>
-        <aside class="modal-list-panel">
-          <p class="panel-kicker">Contemplados deste selo</p>
-          <div id="badgeModalList"></div>
-        </aside>
+      <!-- NÚMEROS -->
+      <section class="numbers" aria-label="A Jornada em números">
+        <div class="container">
+          <div class="numbers-card reveal">
+            <div class="number"><strong><span data-count id="statPessoas">0</span></strong><i></i><span>Talentos na jornada <span data-ano-atual></span></span></div>
+            <div class="number"><strong><span data-count id="statCoins">0</span><small>mil</small></strong><i></i><span>Savacoins conquistados</span></div>
+            <div class="number"><strong><span data-count id="statSelos">0</span></strong><i></i><span>Selos conquistados no ano</span></div>
+            <div class="number"><strong><span data-count id="statNiveis">6</span></strong><i></i><span>Níveis de evolução</span></div>
+          </div>
+        </div>
       </section>
-    </div>
+
+      <!-- SOBRE -->
+      <section class="section section-light section-tight" id="sobre">
+        <div class="container about-grid">
+          <div class="about-copy reveal">
+            <p class="kicker">Sobre o programa</p>
+            <h2>O que é a Jornada SAVA?</h2>
+            <p>A Jornada SAVA é o nosso programa interno de valorização, reconhecimento e desenvolvimento, criado para fortalecer a cultura de engajamento, o aprendizado contínuo, o protagonismo e a colaboração entre todos os colaboradores.</p>
+          </div>
+          <div class="about-cards">
+            <article class="about-card reveal"><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-coins" /></svg></span><h3>Savacoins</h3><p>Pontos que representam suas conquistas.</p></article>
+            <article class="about-card reveal"><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-award" /></svg></span><h3>Selos de conquista</h3><p>Marcam suas realizações.</p></article>
+            <article class="about-card reveal"><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-star" /></svg></span><h3>Reconhecimento simbólico</h3><p>Visibilidade para o seu impacto.</p></article>
+            <article class="about-card reveal"><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-gift" /></svg></span><h3>Premiações</h3><p>Experiências que celebram grandes jornadas.</p></article>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMO FUNCIONA -->
+      <section class="section section-dark lines" id="como-funciona">
+        <div class="container">
+          <div class="section-head reveal">
+            <p class="kicker">Como funciona?</p>
+            <h2>Da ação ao reconhecimento</h2>
+            <p>Um ciclo simples, transparente e que valoriza o que você faz todos os dias.</p>
+          </div>
+          <div class="flow-wrap">
+            <div class="flow-line" aria-hidden="true"><span id="flowProgress"></span></div>
+            <ol class="flow" id="flow"></ol>
+          </div>
+          <div class="flow-note reveal">
+            <div><span class="icon-badge dark"><svg class="ico" aria-hidden="true"><use href="#i-calendar" /></svg></span><p>Resultados divulgados a cada bimestre, nos eventos de <strong>Aniversariante do Mês</strong>.</p></div>
+            <div><span class="icon-badge dark"><svg class="ico" aria-hidden="true"><use href="#i-trophy" /></svg></span><p><strong>Dezembro e janeiro sem pontuação.</strong> Premiação anual final em <strong>janeiro</strong> (referente ao ano anterior).</p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PONTUAÇÃO -->
+      <section class="section section-light" id="pontuacao">
+        <div class="container">
+          <div class="section-head split reveal">
+            <div><p class="kicker">Pontuação bimestral</p><h2>Critérios por área de atuação</h2></div>
+            <p>Suas atividades, competências e contribuições geram pontos que reconhecem o seu impacto na Jornada SAVA.</p>
+          </div>
+          <div class="score-grid" id="scoreGrid"></div>
+        </div>
+      </section>
+
+      <!-- INDICADORES -->
+      <section class="section section-soft section-tight" id="indicadores">
+        <div class="container">
+          <div class="section-head split reveal">
+            <div><p class="kicker">Indicadores de avaliação</p><h2>O que é considerado na sua jornada</h2></div>
+            <p>A avaliação considera diferentes aspectos que refletem o seu desempenho, comportamento e contribuição para o crescimento do SAVA.</p>
+          </div>
+          <div class="ind-grid" id="indGrid"></div>
+        </div>
+      </section>
+
+      <!-- CONQUISTAS -->
+      <section class="section section-black section-tight" id="conquistas">
+        <div class="container">
+          <div class="section-head split reveal">
+            <div><p class="kicker">Selos e títulos de reconhecimento</p><h2>Conquistas que contam a sua história</h2></div>
+            <p>Os selos representam atitudes e resultados que fazem a diferença na nossa cultura. Colecione, evolua e inspire outras pessoas!</p>
+          </div>
+          <div class="seal-grid" id="sealGrid"></div>
+        </div>
+      </section>
+
+      <!-- PREMIAÇÕES -->
+      <section class="awards" id="premiacoes">
+        <div class="container">
+          <div class="section-head center reveal">
+            <p class="kicker">Premiações</p>
+            <h2>Reconhecimento a cada bimestre e ao fim do ano</h2>
+          </div>
+
+          <article class="amb-card reveal">
+            <div class="amb-copy">
+              <p class="kicker">Premiação bimestral · Embaixador(a) SAVA</p>
+              <h3>Impacto que inspira</h3>
+              <p>O maior destaque geral de cada bimestre recebe o título <strong>Embaixador(a) SAVA</strong> e uma experiência especial, escolhida entre as opções oferecidas pelo escritório.</p>
+              <ul class="amb-perks">
+                <li><svg class="ico" aria-hidden="true"><use href="#i-award" /></svg>Reconhecimento especial</li>
+                <li><svg class="ico" aria-hidden="true"><use href="#i-gift" /></svg>Experiência exclusiva</li>
+                <li><svg class="ico" aria-hidden="true"><use href="#i-eye" /></svg>Visibilidade institucional</li>
+                <li><svg class="ico" aria-hidden="true"><use href="#i-sparkles" /></svg>Inspiração para a equipe</li>
+              </ul>
+            </div>
+            <div class="amb-photo"><img src="assets/img/embaixador.jpg" alt="Colaboradora celebrando o título de Embaixadora SAVA" loading="lazy" /></div>
+          </article>
+
+          <div class="exc-top">
+            <div class="exc-copy reveal">
+              <p class="kicker">Premiação anual</p>
+              <h2 class="exc-title">SAVA<br /><span>Excelência</span></h2>
+              <p>Reconhece os <strong>3 colaboradores</strong> que mais se destacaram no ano, com base em desempenho, engajamento, protagonismo e desenvolvimento contínuo.</p>
+              <a class="btn btn-gold" href="#excDetalhes">Conheça a premiação</a>
+            </div>
+            <div class="exc-carousel reveal" id="excCarousel">
+              <div class="exc-stage" id="excStage" aria-live="polite"></div>
+              <button class="car-arrow prev" type="button" data-dir="-1" aria-label="Experiência anterior"><svg class="ico" aria-hidden="true"><use href="#i-chev-l" /></svg></button>
+              <button class="car-arrow next" type="button" data-dir="1" aria-label="Próxima experiência"><svg class="ico" aria-hidden="true"><use href="#i-chev-r" /></svg></button>
+              <div class="exc-thumbs" id="excThumbs" role="tablist" aria-label="Experiências"></div>
+            </div>
+          </div>
+
+          <div class="exc-details" id="excDetalhes">
+            <div class="exc-card exc-scoring reveal">
+              <div><h3>Como é a pontuação</h3><div class="weights" id="weights"></div></div>
+              <div class="tiebreak">
+                <span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-list" /></svg></span>
+                <h3>Critérios de desempate</h3>
+                <ol><li>Maior nota na Jornada SAVA</li><li>Maior nota na Avaliação de Desempenho</li><li>Maior tempo de trabalho no SAVA</li></ol>
+              </div>
+            </div>
+            <div class="exc-card reveal">
+              <h3>Experiências personalizadas</h3>
+              <p class="muted">Escolhidas pelo vencedor, para celebrar essa conquista.</p>
+              <div class="exp-grid">
+                <div><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-plane" /></svg></span><b>Viagem com acompanhante</b><small>Para celebrar com quem você ama.</small></div>
+                <div><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-bed" /></svg></span><b>Hospedagem e gastronomia</b><small>Descanso e boa mesa.</small></div>
+                <div><span class="icon-badge"><svg class="ico" aria-hidden="true"><use href="#i-compass" /></svg></span><b>Experiência temática</b><small>Aventura, cultura ou bem-estar.</small></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- NÍVEIS -->
+      <section class="section section-light section-tight" id="niveis">
+        <div class="container">
+          <div class="section-head split reveal">
+            <div><p class="kicker">Instâncias de evolução · Níveis</p><h2>Uma trilha de crescimento</h2></div>
+            <p>Conquiste Savacoins ao longo do ano, evolua de nível e desbloqueie novos patamares na sua jornada.</p>
+          </div>
+          <ol class="levels" id="levels"></ol>
+        </div>
+      </section>
+
+      <!-- VENCEDORES -->
+      <section class="section section-black section-tight winners" id="vencedores">
+        <div class="container">
+          <div class="section-head center reveal">
+            <p class="kicker">Hall da fama</p>
+            <h2>Quem fez história na jornada</h2>
+          </div>
+          <div class="hall reveal" id="hall">
+            <div class="hall-stage" id="hallStage"></div>
+            <div class="hall-dots" id="hallDots"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-grid">
+        <div>
+          <a class="brand brand-footer" href="#inicio"><img src="assets/logo/sava-simbolo.png" alt="" /><span><small>Jornada</small>SAVA</span></a>
+          <p>Programa de valorização, reconhecimento e desenvolvimento do Sebadelhe Aranha &amp; Vasconcelos Advocacia.</p>
+        </div>
+        <div>
+          <h4>Navegação</h4>
+          <div class="footer-links">
+            <a href="#sobre">Sobre</a><a href="#conquistas">Conquistas</a>
+            <a href="#como-funciona">Como funciona</a><a href="#niveis">Níveis</a>
+            <a href="#pontuacao">Pontuação</a><a href="#premiacoes">Premiações</a>
+          </div>
+        </div>
+        <div>
+          <h4>Área da equipe</h4>
+          <p>Acesso restrito à administração, RH e líderes.</p>
+          <a class="btn btn-outline-light btn-sm" href="login.html">Entrar no sistema</a>
+        </div>
+      </div>
+      <div class="container footer-bottom">
+        <div class="footer-copy">
+          <p>© <span data-ano-atual></span> Jornada SAVA. Todos os direitos reservados.</p>
+          <p>Sebadelhe Aranha &amp; Vasconcelos Advocacia</p>
+        </div>
+        <p class="footer-dev">Desenvolvido por <a href="https://nextecnologias.com.br" target="_blank" rel="noopener">NEX Tecnologias</a></p>
+      </div>
+    </footer>
   </body>
 </html>
