@@ -13,8 +13,7 @@ base/*
 docs/
 
 # Variáveis de ambiente e credenciais.
-.env
-.env.*
+.env*
 !.env.example
 
 # Arquivos temporários e de trabalho
@@ -37,3 +36,16 @@ desktop.ini
 # Backend
 server/node_modules/
 backups/
+
+# Credenciais e chaves locais.
+.npmrc
+.netrc
+.pgpass
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_ed25519
+credentials*.json
+service-account*.json

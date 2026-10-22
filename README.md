@@ -129,12 +129,12 @@ Precisa do Node.js 20+ e de um PostgreSQL local (ou `docker compose up db`).
 ```powershell
 cd server
 npm install
-$env:DATABASE_URL = ""
-npm start
+# Configure DATABASE_URL em ../.env antes de iniciar.
+npm run dev
 ```
 
-Depois acesse `http://localhost:3000/`. Sem `ADMIN_PASSWORD`, o administrador inicial é
-`admin@sava.adv.br` / `` (o sistema pede a troca no primeiro acesso).
+Defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` no ambiente para a criação inicial.
+Não existe senha padrão; contas já existentes mantêm a senha cadastrada no banco.
 
 O `python -m http.server` não serve mais: sem a API, o login e os lançamentos não funcionam.
 
@@ -149,3 +149,16 @@ python scripts\build_dados_painel.py
 
 Os arquivos `base/dados-painel.js` e `base/dados-painel.json` são gerados novamente. Na VPS, basta
 substituir os dois arquivos em `/opt/jornada-sava/base/` (a pasta é montada no container).
+
+
+## Configuração segura
+
+`DATABASE_URL` é obrigatória; o Compose já a transmite ao servidor. Fora do Docker,
+configure-a explicitamente no `.env`. O Compose interpola `POSTGRES_PASSWORD` sem
+codificação automática; para uma instalação nova, prefira uma senha aleatória com
+caracteres seguros para URL (ex.: `openssl rand -hex 32`). Não altere a configuração
+de um banco existente sem coordenar a rotação da senha no banco e na aplicação.
+
+Arquivos `.env*`, exceto `.env.example`, e chaves locais ficam fora do Git e do build.
+Não publique segredos em código, documentação, logs ou pacotes de entrega. A alteração
+de `ADMIN_PASSWORD` não redefine um usuário já criado. Consulte `SECURITY.md`.
