@@ -15,7 +15,7 @@ sozinha, a senha de um usuário já persistido ou de um banco com volume inicial
 
 Testes locais: `node --test server/test/security-config.test.js`.
 
-O histórico está sendo saneado após autorização do proprietário. Clones anteriores
+O histórico das branches publicadas foi saneado após autorização do proprietário. Clones anteriores
 devem ser substituídos ou reconciliados antes de qualquer push para não reintroduzir
 os valores antigos. Cópias de terceiros, caches e referências de pull requests podem
 exigir providências adicionais junto aos respectivos responsáveis.
