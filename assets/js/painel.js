@@ -159,10 +159,8 @@ async function init() {
 }
 
 function bindEvents() {
-  document.querySelector(".segmented-control")?.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-year]");
-    if (!button) return;
-    setActiveYear(Number(button.dataset.year));
+  document.querySelector("#yearFilter")?.addEventListener("change", (event) => {
+    setActiveYear(Number(event.target.value));
     render();
   });
 
@@ -306,23 +304,22 @@ function restoreYearFromUrl() {
   if (state.years.has(requestedYear)) setActiveYear(requestedYear);
 }
 
-// Uma aba por ano com dados, do mais recente ao mais antigo. O ano mais recente é a Jornada
-// em andamento; os anteriores aparecem como "Resultado".
+// Seletor de ano com todos os anos que têm dados, do mais recente ao mais antigo. O mais recente
+// é a Jornada em andamento; os anteriores aparecem como "Resultado".
 function renderYearTabs() {
-  const control = document.querySelector(".segmented-control");
+  const select = document.querySelector("#yearFilter");
   const years = [...state.years.keys()].sort((a, b) => b - a);
-  if (!control || !years.length) return;
+  if (!select || !years.length) return;
   if (!state.years.has(state.activeYear)) state.activeYear = years[0];
-  control.innerHTML = years
-    .map((year, i) => {
-      const active = year === state.activeYear;
-      return `<button class="segment${active ? " active" : ""}" type="button" data-year="${year}" role="tab" aria-selected="${active}">${i === 0 ? year : `Resultado ${year}`}</button>`;
-    })
+  select.innerHTML = years
+    .map((year, i) => `<option value="${year}" ${year === state.activeYear ? "selected" : ""}>${i === 0 ? `Jornada ${year}` : `Resultado ${year}`}</option>`)
     .join("");
 }
 
 function setActiveYear(year) {
   state.activeYear = year;
+  const select = document.querySelector("#yearFilter");
+  if (select) select.value = String(year);
   document.querySelectorAll("[data-year]").forEach((item) => {
     const active = Number(item.dataset.year) === state.activeYear;
     item.classList.toggle("active", active);
