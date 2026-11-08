@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Painel · Jornada SAVA</title>
     <link rel="icon" href="favicon.ico" />
-    <link rel="stylesheet" href="assets/css/painel.css?v=4" />
+    <link rel="stylesheet" href="assets/css/painel.css?v=5" />
     <script>
       // O painel faz parte do sistema: o servidor só entrega esta página com sessão ativa,
       // e aberta fora do sistema ela volta para dentro dele.
@@ -18,7 +18,7 @@
     <script src="assets/js/regras.js" defer></script>
     <script src="assets/js/store.js?v=3" defer></script>
     <script src="assets/js/painel-bridge.js?v=3" defer></script>
-    <script src="assets/js/painel.js?v=4" defer></script>
+    <script src="assets/js/painel.js?v=5" defer></script>
   </head>
   <body>
     <div class="app-shell">
@@ -84,6 +84,7 @@
             </div>
             <div class="winner-image-frame" id="winnerImageFrame">
               <img id="winnerImage" src="assets/logo/sava-simbolo.png" alt="Imagem do destaque" />
+              <span class="winner-initials" id="winnerInitials" aria-hidden="true" hidden></span>
             </div>
             <div class="winner-copy">
               <p class="panel-kicker" id="winnerKicker">Destaque 2026</p>
@@ -166,6 +167,7 @@
           <div class="winner-modal-rays" aria-hidden="true"></div>
           <div class="winner-modal-glow" aria-hidden="true"></div>
           <img id="winnerModalPhoto" src="" alt="" />
+          <span class="winner-initials winner-initials-modal" id="winnerModalInitials" aria-hidden="true" hidden></span>
         </div>
         <div class="winner-modal-copy">
           <p class="winner-modal-kicker">Campeão do ciclo</p>

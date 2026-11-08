@@ -744,6 +744,40 @@ h1 {
   filter: blur(16px) saturate(0.7);
 }
 
+.winner-initials {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, #3a3a36, #141412 72%);
+  color: var(--gold-strong, #e5c07c);
+  font-size: 3.4rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  user-select: none;
+}
+
+.winner-initials[hidden],
+.winner-image-frame img[hidden],
+.winner-modal-photo-wrap img[hidden] {
+  display: none;
+}
+
+/* Nomes ocultos: as iniciais também somem para não revelar o 1º lugar. */
+.winner-image-frame.is-masked .winner-initials {
+  color: transparent;
+}
+
+.winner-initials-modal {
+  width: 160px;
+  height: 160px;
+  border: 2px solid #100f0d;
+}
+
 .winner-image-frame.is-masked::after {
   content: "?";
   position: absolute;

@@ -126,6 +126,8 @@ const els = {
   winnerLevel: document.querySelector("#winnerLevel"),
   winnerImage: document.querySelector("#winnerImage"),
   winnerImageFrame: document.querySelector("#winnerImageFrame"),
+  winnerInitials: document.querySelector("#winnerInitials"),
+  winnerModalInitials: document.querySelector("#winnerModalInitials"),
   searchInput: document.querySelector("#searchInput"),
   levelFilter: document.querySelector("#levelFilter"),
   categoryFilter: document.querySelector("#categoryFilter"),
@@ -267,6 +269,16 @@ function bindEvents() {
 
 function getDefaultWinnerPhoto(year) {
   return winnerPhotosByYear[Number(year)] || "assets/logo/sava-simbolo.png";
+}
+
+// Enquanto não há foto de perfil, o destaque de um ano sem foto do vencedor mostra as iniciais
+// do 1º lugar. Anos com foto cadastrada (winnerPhotosByYear) continuam com a foto.
+function showWinnerPortrait(img, initialsEl, year, winner) {
+  const useInitials = Boolean(winner) && !winnerPhotosByYear[Number(year)];
+  img.hidden = useInitials;
+  initialsEl.hidden = !useInitials;
+  initialsEl.textContent = useInitials ? getInitials(winner.name) : "";
+  if (!useInitials) img.src = getDefaultWinnerPhoto(year);
 }
 
 function restorePreferences() {
@@ -700,12 +712,12 @@ function renderWinner(yearData) {
     els.winnerName.textContent = "Sem dados";
     els.winnerScore.textContent = "0";
     els.winnerLevel.textContent = "Nível acumulado";
-    els.winnerImage.src = getDefaultWinnerPhoto(yearData.year);
+    showWinnerPortrait(els.winnerImage, els.winnerInitials, yearData.year, null);
     setWinnerMasked(false);
     return;
   }
 
-  els.winnerImage.src = getDefaultWinnerPhoto(yearData.year);
+  showWinnerPortrait(els.winnerImage, els.winnerInitials, yearData.year, winner);
 
   const privacy = state.namesPrivacy;
   setWinnerMasked(privacy.active && !privacy.championRevealed);
@@ -756,6 +768,7 @@ function spawnConfetti(container, count = 150) {
 function openWinnerModal(winner) {
   if (!winner) return;
   els.winnerModalPhoto.src = els.winnerImage.src;
+  showWinnerPortrait(els.winnerModalPhoto, els.winnerModalInitials, state.activeYear, winner);
   els.winnerModalName.textContent = winner.name;
   els.winnerModalLevel.textContent = getPersonLevel(winner).name;
   els.winnerModalScore.textContent = formatNumber(winner.score);
