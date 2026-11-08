@@ -125,6 +125,18 @@ const pessoaDoBanco = (r) => ({
 
 const lancamentoDoBanco = (r) => ({ ...r.dados, id: r.id, ano: r.ano, tipo: r.tipo, autorId: r.autor_id, criadoEm: r.criado_em });
 
+const atividadeDoBanco = (r) => ({
+  id: r.id,
+  ano: r.ano,
+  tipo: r.tipo,
+  titulo: r.titulo,
+  data: r.data,
+  pontos: r.pontos,
+  descricao: r.descricao,
+  autorId: r.autor_id,
+  criadoEm: r.criado_em,
+});
+
 module.exports = {
   pool,
   uid,
@@ -137,4 +149,5 @@ module.exports = {
   usuarioPublico,
   pessoaDoBanco,
   lancamentoDoBanco,
+  atividadeDoBanco,
 };

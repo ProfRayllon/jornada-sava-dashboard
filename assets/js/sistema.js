@@ -13,6 +13,7 @@
     visao: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
     painel: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v1.5A3.5 3.5 0 0 1 16.5 10M7 5H4v1.5A3.5 3.5 0 0 0 7.5 10"/>',
     lancar: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    eventos: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/>',
     historico: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5M12 7.5V12l3 2"/>',
     pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-3.5-5.8"/>',
     equipe: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/>',
@@ -39,12 +40,20 @@
   };
 
   const tipos = {
-    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros (até 2.300 Savacoins no ano).", cor: "#9d2824", icone: ico("felicidade") },
-    evento: { nome: "Evento institucional", desc: "Frequência em eventos (até 700 Savacoins no ano).", cor: "#3a3c39", icone: ico("evento") },
-    avaliacao: { nome: "Avaliação do líder", desc: "Técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
+    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros cadastrados (até 2.300 Savacoins no ano).", cor: "#9d2824", icone: ico("felicidade") },
+    evento: { nome: "Evento institucional", desc: "Participação nos eventos cadastrados (até 700 Savacoins no ano).", cor: "#3a3c39", icone: ico("evento") },
+    avaliacao: { nome: "Avaliação do líder", desc: "Por ciclo de avaliação: técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
     indicacao: { nome: "Indicação de negócio", desc: "Bônus de 500 Savacoins, exclusivo dos advogados.", cor: "#2f7a5b", icone: ico("indicacao") },
-    missao: { nome: "Missão secreta", desc: "Missões divulgadas previamente pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
+    missao: { nome: "Missão secreta", desc: "Missões cadastradas e divulgadas pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
     protagonista: { nome: "Selo Sou Protagonista", desc: "Indicação do líder por inovação, melhoria ou inspiração.", cor: "#b08a3e", icone: ico("protagonista") },
+  };
+
+  // Tipos de evento cadastrados na aba Eventos e o valor sugerido por pessoa.
+  const tiposAtividade = {
+    felicidade: { nome: "Encontro do Programa de Felicidade", curto: "Encontro", pontos: R.pontosPorEncontroFelicidade },
+    evento: { nome: "Evento institucional", curto: "Evento", pontos: 350 },
+    missao: { nome: "Missão secreta", curto: "Missão", pontos: 200 },
+    avaliacao: { nome: "Ciclo de avaliação do líder", curto: "Ciclo de avaliação", pontos: null },
   };
 
   const pilares = [
@@ -57,13 +66,14 @@
   const views = {
     visao: { nome: "Visão geral", kicker: "Acompanhamento da Jornada", render: renderVisao },
     painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel },
+    eventos: { nome: "Eventos", kicker: "Encontros, eventos, missões e ciclos", render: renderEventos, perfis: ["admin", "rh"] },
     lancar: { nome: "Novo lançamento", kicker: "Registrar pontuação", render: renderLancar },
     historico: { nome: "Lançamentos", kicker: "Histórico do ano", render: renderHistorico },
     pessoas: { nome: "Colaboradores", kicker: "Pessoas avaliadas", render: renderPessoas, perfis: ["admin", "rh"] },
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, tipoLancamento: null };
+  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, ev: { tipo: "all" }, atividadeSel: {}, tipoLancamento: null };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
@@ -523,51 +533,296 @@
     atualizar();
   }
 
-  function campoChecklist() {
-    const lista = pessoasAtivas();
+  // ---------------- Eventos (base dos lançamentos) ----------------
+  // Tipos que dependem de um evento cadastrado: a data e o ano vêm dele.
+  const TIPOS_COM_EVENTO = ["felicidade", "evento", "missao", "avaliacao"];
+
+  function atividadesDoTipo(tipo) {
+    return S.listarAtividades()
+      .filter((a) => a.tipo === tipo)
+      .sort((a, b) => b.data.localeCompare(a.data));
+  }
+
+  // Quem já recebeu pontos num evento (pessoa → Savacoins).
+  function pontuadosNaAtividade(id) {
+    const mapa = new Map();
+    S.listarLancamentos()
+      .filter((l) => l.atividadeId === id)
+      .forEach((l) => (l.pessoaIds || [l.pessoaId]).forEach((p) => mapa.set(p, l.pontos)));
+    return mapa;
+  }
+
+  function podeCadastrarEventos() {
+    return ["admin", "rh"].includes(state.usuario.perfil);
+  }
+
+  function renderEventos(el) {
+    const ano = state.ano;
+    const f = state.ev;
+    const lista = S.listarAtividades()
+      .filter((a) => a.ano === ano && (f.tipo === "all" || a.tipo === f.tipo))
+      .sort((a, b) => a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo));
+
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-head">
+          <div><h2>Eventos da Jornada ${ano}</h2><p class="muted">Cadastre os encontros, eventos, missões e ciclos de avaliação. Os pontos são lançados a partir deles, já com a data e o ano certos.</p></div>
+          <div class="filters">
+            ${seletorAno("eAno")}
+            <select id="eTipo" aria-label="Tipo de evento"><option value="all">Todos os tipos</option>${Object.entries(tiposAtividade)
+              .map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`)
+              .join("")}</select>
+            <button class="btn btn-gold" id="novoEvento">+ Novo evento</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>Data</th><th>Evento</th><th class="num">Savacoins por pessoa</th><th class="num">Pontuados</th><th></th></tr></thead>
+            <tbody>
+              ${lista
+                .map((a) => {
+                  const n = pontuadosNaAtividade(a.id).size;
+                  return `<tr>
+                    <td>${dataBr(a.data)}</td>
+                    <td><span class="type-tag" style="--c:${tipos[a.tipo].cor}">${tipos[a.tipo].icone} ${tiposAtividade[a.tipo].curto}</span><strong class="ev-nome">${esc(a.titulo)}</strong>${a.descricao ? `<small>${esc(a.descricao)}</small>` : ""}</td>
+                    <td class="num">${a.pontos ? fmt(a.pontos) : "<small>Notas do líder</small>"}</td>
+                    <td class="num">${fmt(n)}</td>
+                    <td><div class="row-actions">
+                      <button class="btn btn-gold btn-sm" data-lancar="${a.id}">${a.tipo === "avaliacao" ? "Avaliar" : "Lançar pontos"}</button>
+                      <button class="link-btn" data-editar="${a.id}">Editar</button>
+                      ${n ? "" : `<button class="link-btn danger" data-excluir="${a.id}">Excluir</button>`}
+                    </div></td>
+                  </tr>`;
+                })
+                .join("") || `<tr><td colspan="5" class="empty">Nenhum evento cadastrado em ${ano}. Clique em “+ Novo evento”.</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    ligarSeletorAno(el, "eAno", renderEventos);
+    $("#eTipo", el).addEventListener("change", (e) => {
+      f.tipo = e.target.value;
+      renderEventos(el);
+    });
+    $("#novoEvento", el).addEventListener("click", () => formAtividade({ tipo: f.tipo !== "all" ? f.tipo : "felicidade" }));
+    $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formAtividade(S.listarAtividades().find((a) => a.id === b.dataset.editar))));
+    $$("[data-lancar]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        const a = S.listarAtividades().find((x) => x.id === b.dataset.lancar);
+        state.atividadeSel[a.tipo] = a.id;
+        irPara("lancar", { tipoLancamento: a.tipo, pessoaPreSelecionada: null });
+      }),
+    );
+    $$("[data-excluir]", el).forEach((b) =>
+      b.addEventListener("click", async () => {
+        if (!confirm("Excluir este evento?")) return;
+        try {
+          await S.excluirAtividade(b.dataset.excluir);
+        } catch (err) {
+          return toast(err.message);
+        }
+        toast("Evento excluído.");
+        renderEventos(el);
+      }),
+    );
+  }
+
+  function formAtividade(a = {}) {
+    const tipoInicial = a.tipo || "felicidade";
+    abrirModal(
+      a.id ? "Editar evento" : "Novo evento",
+      `<form class="form-grid" id="atvForm" novalidate>
+        <label class="field field-full"><span>Tipo</span><select name="tipo">${Object.entries(tiposAtividade)
+          .map(([id, t]) => `<option value="${id}" ${tipoInicial === id ? "selected" : ""}>${t.nome}</option>`)
+          .join("")}</select></label>
+        <label class="field field-full"><span>Nome</span><input name="titulo" required value="${esc(a.titulo || "")}" placeholder="Ex.: Café da felicidade de março" /></label>
+        <label class="field"><span>Data</span><input type="date" name="data" required value="${a.data || dataPadrao(state.ano)}" /><small class="field-hint" id="atvAno"></small></label>
+        <label class="field" id="atvPontos"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" step="25" value="${a.pontos ?? tiposAtividade[tipoInicial].pontos ?? ""}" /></label>
+        <label class="field field-full"><span>Descrição (opcional)</span><input name="descricao" value="${esc(a.descricao || "")}" placeholder="Ex.: local, tema ou regra da missão" /></label>
+        <p class="form-error field-full" id="atvErro"></p>
+        <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Salvar evento</button></div>
+      </form>`,
+    );
+    const form = $("#atvForm");
+    const campo = (nome) => form.elements.namedItem(nome);
+    const sincronizar = () => {
+      $("#atvPontos").hidden = campo("tipo").value === "avaliacao";
+      const d = campo("data").value;
+      $("#atvAno").textContent = d ? `Entra na Jornada ${d.slice(0, 4)}` : "";
+    };
+    campo("tipo").addEventListener("change", () => {
+      if (!a.id) campo("pontos").value = tiposAtividade[campo("tipo").value].pontos ?? "";
+      sincronizar();
+    });
+    campo("data").addEventListener("input", sincronizar);
+    sincronizar();
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const tipo = campo("tipo").value;
+      const titulo = campo("titulo").value.trim();
+      const data = campo("data").value;
+      const pontos = tipo === "avaliacao" ? null : Number(campo("pontos").value);
+      if (!titulo) return ($("#atvErro").textContent = "Informe o nome do evento.");
+      if (!data) return ($("#atvErro").textContent = "Informe a data.");
+      if (tipo !== "avaliacao" && (!pontos || pontos < 1)) return ($("#atvErro").textContent = "Informe os Savacoins por pessoa.");
+      try {
+        const salvo = await S.salvarAtividade({ id: a.id, tipo, titulo, data, pontos, descricao: campo("descricao").value });
+        state.atividadeSel[salvo.tipo] = salvo.id;
+        state.ano = salvo.ano;
+      } catch (err) {
+        return ($("#atvErro").textContent = err.message);
+      }
+      fecharModal();
+      toast(a.id ? "Evento atualizado." : "Evento cadastrado.");
+      render();
+    });
+  }
+
+  // Seletor do evento no lançamento, agrupado por ano. A data e o ano vêm do evento.
+  function campoAtividade(tipo) {
+    const lista = atividadesDoTipo(tipo);
+    if (!lista.length) return null;
+    let sel = state.atividadeSel[tipo];
+    if (!lista.some((a) => a.id === sel)) sel = (lista.find((a) => a.ano === state.ano) || lista[0]).id;
+    state.atividadeSel[tipo] = sel;
+    const atual = lista.find((a) => a.id === sel);
+    const anos = [...new Set(lista.map((a) => a.ano))].sort((a, b) => b - a);
+    return {
+      atual,
+      html: `
+        <label class="field field-wide"><span>${tiposAtividade[tipo].curto}</span><select name="atividadeId" id="atividadeSel">
+          ${anos
+            .map(
+              (ano) => `<optgroup label="Jornada ${ano}">${lista
+                .filter((a) => a.ano === ano)
+                .map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${dataBr(a.data)} · ${esc(a.titulo)}</option>`)
+                .join("")}</optgroup>`,
+            )
+            .join("")}
+        </select></label>
+        <div class="field"><span>Data · Jornada</span><div class="static-value">${dataBr(atual.data)} · Jornada ${atual.ano}</div></div>`,
+    };
+  }
+
+  function semAtividade(tipo) {
+    const nome = tiposAtividade[tipo].curto.toLowerCase();
+    return `<div class="empty-state field-full">
+      <strong>Nenhum ${nome} cadastrado ainda.</strong>
+      <p class="muted small">Os pontos são lançados a partir de um ${nome} cadastrado na aba Eventos, que já define a data e o ano.</p>
+      ${podeCadastrarEventos() ? `<button type="button" class="btn btn-gold" id="cadastrarAtv">+ Cadastrar ${nome}</button>` : `<p class="muted small">Peça ao RH para cadastrar o ${nome}.</p>`}
+    </div>`;
+  }
+
+  // Lista de participantes com filtro por área e Savacoins por pessoa (pontuação em lote).
+  function campoParticipantes(atividade) {
+    const ja = pontuadosNaAtividade(atividade.id);
+    const padrao = atividade.pontos || "";
     return `
       <div class="field field-full">
-        <span>Participantes <em id="selCount">0 selecionado(s)</em></span>
+        <span>Participantes <em id="selCount"></em></span>
         <div class="checklist-tools">
-          <input type="search" id="ckBusca" placeholder="Filtrar nomes" />
+          <input type="search" id="ckBusca" placeholder="Buscar nome" />
+          <div class="seg seg-sm" id="ckArea" role="group" aria-label="Filtrar por área">
+            <button type="button" data-area="all" class="active">Todos</button>
+            <button type="button" data-area="adm">ADM</button>
+            <button type="button" data-area="adv">ADV</button>
+          </div>
           <button type="button" class="link-btn" id="ckTodos">Marcar visíveis</button>
           <button type="button" class="link-btn" id="ckNenhum">Limpar</button>
+          <span class="ck-padrao">Savacoins <input type="number" id="ckPadrao" min="1" step="25" value="${padrao}" aria-label="Savacoins padrão" /><button type="button" class="link-btn" id="ckAplicar">Aplicar aos marcados</button></span>
         </div>
-        <div class="checklist" id="checklist">
-          ${lista.map((p) => `<label data-nome="${esc(S.normalizar(p.nome))}"><input type="checkbox" name="pessoas" value="${p.id}" /><span>${esc(nomeBonito(p.nome))}</span><small>${p.categoria === "adv" ? "ADV" : p.categoria === "adm" ? "ADM" : ""}</small></label>`).join("")}
+        <div class="score-list" id="checklist">
+          ${pessoasAtivas()
+            .map((p) => {
+              const feito = ja.get(p.id);
+              const area = p.categoria === "adv" ? "ADV" : p.categoria === "adm" ? "ADM" : "";
+              return `<div class="score-line${feito != null ? " done" : ""}" data-nome="${esc(S.normalizar(p.nome))}" data-area="${p.categoria || ""}">
+                <label><input type="checkbox" value="${p.id}" ${feito != null ? "disabled" : ""} /><span>${esc(nomeBonito(p.nome))}</span><small>${area}</small></label>
+                ${feito != null ? `<span class="done-tag">já pontuado · ${fmt(feito)}</span>` : `<input type="number" class="pts" min="1" step="25" value="${padrao}" aria-label="Savacoins de ${esc(nomeBonito(p.nome))}" />`}
+              </div>`;
+            })
+            .join("")}
         </div>
+        <p class="muted small">Marque quem participou. Para dar um valor diferente a alguém, é só mudar o número ao lado do nome. Quem já foi pontuado neste evento aparece bloqueado.</p>
       </div>`;
   }
 
-  function campoPessoa(categoria, rotulo = "Colaborador(a)") {
+  function ligarParticipantes(form) {
+    const linhas = $$(".score-line", form);
+    const caixa = (l) => $('input[type="checkbox"]', l);
+    let area = "all";
+    let busca = "";
+    const filtrar = () => linhas.forEach((l) => (l.hidden = (area !== "all" && l.dataset.area !== area) || (busca && !l.dataset.nome.includes(busca))));
+    const resumo = () => {
+      const marcadas = linhas.filter((l) => caixa(l).checked);
+      const total = marcadas.reduce((t, l) => t + Number($(".pts", l)?.value || 0), 0);
+      $("#selCount", form).textContent = `${marcadas.length} selecionado(s) · ${fmt(total)} Savacoins`;
+    };
+    $("#ckBusca", form).addEventListener("input", (e) => {
+      busca = S.normalizar(e.target.value);
+      filtrar();
+    });
+    $$("#ckArea [data-area]", form).forEach((b) =>
+      b.addEventListener("click", () => {
+        area = b.dataset.area;
+        $$("#ckArea [data-area]", form).forEach((x) => x.classList.toggle("active", x === b));
+        filtrar();
+      }),
+    );
+    $("#ckTodos", form).addEventListener("click", () => {
+      linhas.filter((l) => !l.hidden && !caixa(l).disabled).forEach((l) => (caixa(l).checked = true));
+      resumo();
+    });
+    $("#ckNenhum", form).addEventListener("click", () => {
+      linhas.forEach((l) => (caixa(l).checked = false));
+      resumo();
+    });
+    // O valor padrão vale para quem ainda não foi marcado; "Aplicar" leva o valor aos já marcados.
+    $("#ckPadrao", form).addEventListener("input", (e) => {
+      linhas.filter((l) => !caixa(l).checked && $(".pts", l)).forEach((l) => ($(".pts", l).value = e.target.value));
+    });
+    $("#ckAplicar", form).addEventListener("click", () => {
+      const v = $("#ckPadrao", form).value;
+      linhas.filter((l) => caixa(l).checked && $(".pts", l)).forEach((l) => ($(".pts", l).value = v));
+      resumo();
+    });
+    $("#checklist", form).addEventListener("input", (e) => {
+      if (e.target.matches(".pts")) caixa(e.target.closest(".score-line")).checked = true;
+      resumo();
+    });
+    $("#checklist", form).addEventListener("change", resumo);
+    resumo();
+  }
+
+  function campoPessoa(categoria, rotulo = "Colaborador(a)", bloqueados = new Map()) {
     const lista = pessoasAtivas(categoria);
     return `<label class="field"><span>${rotulo}</span><select name="pessoaId" required>
       <option value="">Selecione…</option>
-      ${lista.map((p) => `<option value="${p.id}" ${state.pessoaPreSelecionada === p.id ? "selected" : ""}>${esc(nomeBonito(p.nome))}</option>`).join("")}
+      ${lista
+        .map((p) => {
+          const feito = bloqueados.has(p.id);
+          return `<option value="${p.id}" ${feito ? "disabled" : state.pessoaPreSelecionada === p.id ? "selected" : ""}>${esc(nomeBonito(p.nome))}${feito ? " — já avaliado(a) neste ciclo" : ""}</option>`;
+        })
+        .join("")}
     </select></label>`;
   }
 
   function montarFormulario(form, tipo) {
     const t = tipos[tipo];
     let corpo = "";
-    if (tipo === "felicidade") {
-      corpo = `${campoData()}
-        <label class="field"><span>Encontro</span><input name="titulo" placeholder="Ex.: Café da felicidade" /></label>
-        <label class="field"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" max="${R.maxFelicidadeAno}" step="25" required value="${R.pontosPorEncontroFelicidade}" /></label>
-        ${campoChecklist()}`;
-    } else if (tipo === "evento") {
-      corpo = `${campoData()}
-        <label class="field"><span>Nome do evento</span><input name="titulo" required placeholder="Ex.: Aniversariante do Mês" /></label>
-        <label class="field"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" max="${R.maxEventosAno}" step="25" required value="350" /></label>
-        ${campoChecklist()}`;
-    } else if (tipo === "missao") {
-      corpo = `${campoData()}
-        <label class="field"><span>Missão</span><input name="titulo" required placeholder="Nome da missão secreta" /></label>
-        <label class="field"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" step="25" required value="200" /></label>
-        ${campoChecklist()}`;
+    let semEnvio = false;
+    const atv = TIPOS_COM_EVENTO.includes(tipo) ? campoAtividade(tipo) : null;
+
+    if (TIPOS_COM_EVENTO.includes(tipo) && !atv) {
+      corpo = semAtividade(tipo);
+      semEnvio = true;
+    } else if (["felicidade", "evento", "missao"].includes(tipo)) {
+      corpo = `${atv.html}${campoParticipantes(atv.atual)}`;
     } else if (tipo === "indicacao") {
       corpo = `${campoData()}${campoPessoa("adv", "Advogado(a)")}
-        <div class="field"><span>Pontuação</span><div class="static-value">${fmt(R.pontosIndicacao)} Savacoins</div></div>
+        <div class="field"><span>Pontuação</span><div class="static-value">Bônus de ${fmt(R.pontosIndicacao)} Savacoins</div></div>
         <label class="field field-full"><span>Descrição da indicação</span><textarea name="justificativa" rows="3" placeholder="Cliente/negócio indicado e sócio que validou"></textarea></label>`;
     } else if (tipo === "protagonista") {
       corpo = `${campoData()}${campoPessoa(null)}
@@ -577,14 +832,15 @@
       const cat = form.dataset.cat || pre?.categoria || "adm";
       form.dataset.cat = cat;
       corpo = `
+        ${atv.html}
         <div class="field field-full"><span>Perfil avaliado</span>
           <div class="seg">
             <button type="button" data-cat="adm" class="${cat === "adm" ? "active" : ""}">Controladoria e Administrativo</button>
             <button type="button" data-cat="adv" class="${cat === "adv" ? "active" : ""}">Advogados Associados</button>
           </div>
         </div>
-        ${campoPessoa(cat)}${campoData()}
-        <label class="field"><span>${cat === "adv" ? "Área de atuação" : "Setor"}</span><input name="area" placeholder="${cat === "adv" ? "Ex.: Trabalhista, Energisa PB" : "Ex.: Controladoria"}" value="${esc(pre?.setor || "")}" /></label>
+        ${campoPessoa(cat, "Colaborador(a)", pontuadosNaAtividade(atv.atual.id))}
+        <label class="field field-wide"><span>${cat === "adv" ? "Área de atuação" : "Setor"}</span><input name="area" placeholder="${cat === "adv" ? "Ex.: Trabalhista, Energisa PB" : "Ex.: Controladoria"}" value="${esc(pre?.setor || "")}" /></label>
         <div class="field field-full criteria">
           ${R.criterios[cat]
             .map(
@@ -607,11 +863,17 @@
       <div class="card-head"><div><h2>${t.nome}</h2><p class="muted">${t.desc}</p></div></div>
       <div class="form-grid">${corpo}</div>
       <p class="form-error" id="formError" role="alert"></p>
-      <div class="form-actions"><button type="submit" class="btn btn-gold">Registrar lançamento</button></div>`;
+      ${semEnvio ? "" : `<div class="form-actions"><button type="submit" class="btn btn-gold">Registrar lançamento</button></div>`}`;
 
-    if ($("#checklist", form)) ligarChecklist(form);
+    $("#cadastrarAtv", form)?.addEventListener("click", () => formAtividade({ tipo }));
+    $("#atividadeSel", form)?.addEventListener("change", (e) => {
+      state.atividadeSel[tipo] = e.target.value;
+      state.pessoaPreSelecionada = null;
+      montarFormulario(form, tipo);
+    });
+    if ($("#checklist", form)) ligarParticipantes(form);
     ligarData(form);
-    if (tipo === "avaliacao") {
+    if (tipo === "avaliacao" && atv) {
       $$("[data-cat]", form).forEach((b) =>
         b.addEventListener("click", () => {
           form.dataset.cat = b.dataset.cat;
@@ -627,23 +889,6 @@
       e.preventDefault();
       enviarLancamento(form, tipo);
     };
-  }
-
-  function ligarChecklist(form) {
-    const atualizarContagem = () => ($("#selCount", form).textContent = `${$$('input[name="pessoas"]:checked', form).length} selecionado(s)`);
-    $("#ckBusca", form).addEventListener("input", (e) => {
-      const q = S.normalizar(e.target.value);
-      $$("#checklist label", form).forEach((l) => (l.hidden = q && !l.dataset.nome.includes(q)));
-    });
-    $("#ckTodos", form).addEventListener("click", () => {
-      $$("#checklist label:not([hidden]) input", form).forEach((i) => (i.checked = true));
-      atualizarContagem();
-    });
-    $("#ckNenhum", form).addEventListener("click", () => {
-      $$("#checklist input", form).forEach((i) => (i.checked = false));
-      atualizarContagem();
-    });
-    $("#checklist", form).addEventListener("change", atualizarContagem);
   }
 
   function lerNotas(form) {
@@ -675,31 +920,42 @@
     const erro = $("#formError", form);
     erro.textContent = "";
     const fd = new FormData(form);
-    const data = fd.get("data");
-    if (!data) return (erro.textContent = "Informe a data.");
-    const ano = Number(data.slice(0, 4));
-    if (String(ano) !== fd.get("anoJornada")) return (erro.textContent = `A data precisa ser de ${fd.get("anoJornada")}, o ano da Jornada escolhido.`);
-
-    const dados = { tipo, data, titulo: (fd.get("titulo") || "").trim() };
     const avisos = [];
+    let dados;
+    let ano;
 
+    if (TIPOS_COM_EVENTO.includes(tipo)) {
+      const atv = S.listarAtividades().find((a) => a.id === fd.get("atividadeId"));
+      if (!atv) return (erro.textContent = "Selecione o evento.");
+      ano = atv.ano;
+      dados = { tipo, atividadeId: atv.id };
+    } else {
+      const data = fd.get("data");
+      if (!data) return (erro.textContent = "Informe a data.");
+      ano = Number(data.slice(0, 4));
+      if (String(ano) !== fd.get("anoJornada")) return (erro.textContent = `A data precisa ser de ${fd.get("anoJornada")}, o ano da Jornada escolhido.`);
+      dados = { tipo, data, titulo: "" };
+    }
+
+    let qtd = 1;
     if (["felicidade", "evento", "missao"].includes(tipo)) {
-      dados.pessoaIds = fd.getAll("pessoas");
-      if (!dados.pessoaIds.length) return (erro.textContent = "Selecione ao menos um participante.");
-      dados.pontos = Number(fd.get("pontos"));
-      if (!dados.pontos || dados.pontos < 1) return (erro.textContent = "Informe a pontuação.");
-      if (tipo !== "felicidade" && !dados.titulo) return (erro.textContent = "Informe o nome.");
+      const pessoas = $$(".score-line", form)
+        .filter((l) => $('input[type="checkbox"]', l).checked)
+        .map((l) => ({ id: $('input[type="checkbox"]', l).value, pontos: Number($(".pts", l)?.value) }));
+      if (!pessoas.length) return (erro.textContent = "Marque ao menos um participante.");
+      if (pessoas.some((p) => !p.pontos || p.pontos < 1)) return (erro.textContent = "Informe os Savacoins de todos os participantes marcados.");
+      dados.pessoas = pessoas;
+      qtd = pessoas.length;
 
       const limite = tipo === "felicidade" ? R.maxFelicidadeAno : tipo === "evento" ? R.maxEventosAno : null;
       if (limite) {
-        const acima = dados.pessoaIds.filter((id) => somaNoAno(tipo, id, ano) + dados.pontos > limite);
+        const acima = pessoas.filter((p) => somaNoAno(tipo, p.id, ano) + p.pontos > limite);
         if (acima.length) avisos.push(`${acima.length} pessoa(s) passariam do teto de ${fmt(limite)} Savacoins de ${tipos[tipo].nome.toLowerCase()} em ${ano}.`);
       }
     } else {
       dados.pessoaId = fd.get("pessoaId");
       if (!dados.pessoaId) return (erro.textContent = "Selecione o colaborador.");
       dados.justificativa = (fd.get("justificativa") || "").trim();
-      if (tipo === "indicacao") dados.pontos = R.pontosIndicacao;
       if (tipo === "protagonista" && !dados.justificativa) return (erro.textContent = "Descreva o motivo da indicação.");
       if (tipo === "avaliacao") {
         dados.categoria = form.dataset.cat;
@@ -708,9 +964,6 @@
         dados.area = (fd.get("area") || "").trim();
         dados.feedback = (fd.get("feedback") || "").trim();
         dados.destaque = (fd.get("destaque") || "").trim();
-        dados.pontos = Object.values(dados.notas).reduce((a, b) => a + b, 0);
-        const anteriores = avaliacoesNoAno(dados.pessoaId, ano).length;
-        if (anteriores) avisos.push(`Esta pessoa já tem ${anteriores} avaliação(ões) em ${ano}. Esta será a ${anteriores + 1}ª avaliação do ano.`);
       }
     }
 
@@ -723,7 +976,7 @@
     }
     state.pessoaPreSelecionada = null;
     state.ano = ano;
-    toast(`${tipos[tipo].nome} registrado na Jornada ${ano}. Painel atualizado.`);
+    toast(`${tipos[tipo].nome}: ${qtd > 1 ? `${qtd} pessoas pontuadas` : "registrado"} na Jornada ${ano}.`);
     renderLancar($("#content"));
   }
 

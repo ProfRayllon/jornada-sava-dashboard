@@ -64,7 +64,7 @@
       estado = await api("publico");
     }
     eu = estado.eu || null;
-    db = { usuarios: estado.usuarios || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atualizadoEm: estado.atualizadoEm };
+    db = { usuarios: estado.usuarios || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
@@ -196,12 +196,32 @@
     await aposEscrita();
   }
 
+  // ---------- Eventos (encontros, eventos, missões e ciclos de avaliação) ----------
+  function listarAtividades() {
+    return db?.atividades || [];
+  }
+
+  async function salvarAtividade(dados) {
+    const { atividade } = await api(dados.id ? `atividades/${encodeURIComponent(dados.id)}` : "atividades", {
+      metodo: dados.id ? "PUT" : "POST",
+      corpo: dados,
+    });
+    await aposEscrita();
+    return atividade;
+  }
+
+  async function excluirAtividade(id) {
+    await api(`atividades/${encodeURIComponent(id)}`, { metodo: "DELETE" });
+    await aposEscrita();
+  }
+
   const pontosDoLancamento = R.pontosDoLancamento;
 
   // Anos com dados: os da base das planilhas, os que já têm lançamento e o ano de referência.
   function anosDisponiveis() {
     const anos = new Set([R.anoAtual, ...Object.keys(BASE_PLANILHAS?.years || {}).map(Number)]);
     (db?.lancamentos || []).forEach((l) => l.ano && anos.add(Number(l.ano)));
+    (db?.atividades || []).forEach((a) => a.ano && anos.add(Number(a.ano)));
     return [...anos].filter(Boolean).sort((a, b) => b - a);
   }
 
@@ -296,6 +316,9 @@
     listarLancamentos,
     registrarLancamento,
     excluirLancamento,
+    listarAtividades,
+    salvarAtividade,
+    excluirAtividade,
     pontosDoLancamento,
     anosDisponiveis,
     anoVigente,

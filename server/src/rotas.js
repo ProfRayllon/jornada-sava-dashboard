@@ -4,7 +4,7 @@ const db = require("./db");
 const auth = require("./auth");
 const { gerarHash, conferir } = require("./senha");
 
-const { pool, uid, normalizar, transacao, tocar, usuarioPublico, pessoaDoBanco, lancamentoDoBanco } = db;
+const { pool, uid, normalizar, transacao, tocar, usuarioPublico, pessoaDoBanco, lancamentoDoBanco, atividadeDoBanco } = db;
 const rotas = express.Router();
 
 const PERFIS = ["admin", "rh", "lider"];
@@ -73,6 +73,8 @@ rotas.get("/publico", assincrono(async (req, res) => {
 
 rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
   const tudo = await lerTudo();
+  const { rows: atividades } = await pool.query("SELECT * FROM atividades ORDER BY data DESC, criado_em DESC");
+  tudo.atividades = atividades.map(atividadeDoBanco);
   let usuarios = [];
   if (req.usuario.perfil === "admin") {
     const { rows } = await pool.query("SELECT * FROM usuarios ORDER BY nome");
@@ -192,35 +194,125 @@ async function salvarPessoa(req, res) {
 rotas.post("/pessoas", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 rotas.put("/pessoas/:id", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 
+// ---------- Eventos (atividades) ----------
+// Encontros, eventos, missões e ciclos de avaliação. Todo lançamento desses tipos aponta para um
+// evento e herda dele a data e o ano, então não há como lançar no ano errado.
+const TIPOS_ATIVIDADE = ["felicidade", "evento", "missao", "avaliacao"];
+
+function conferirData(data) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || "")) || Number.isNaN(Date.parse(data))) throw new ErroDeUso("Informe a data.");
+  // Do primeiro ano da Jornada até o ano seguinte ao atual (para já abrir a próxima Jornada).
+  const ano = Number(data.slice(0, 4));
+  const limiteAno = new Date().getFullYear() + 1;
+  if (ano < 2025 || ano > limiteAno) throw new ErroDeUso(`Data fora do período da Jornada (2025 a ${limiteAno}). Confira o ano digitado.`);
+  return ano;
+}
+
+async function salvarAtividade(req, res) {
+  const b = req.body;
+  const id = req.params.id || null;
+  if (!TIPOS_ATIVIDADE.includes(b.tipo)) throw new ErroDeUso("Escolha o tipo do evento.");
+  const titulo = texto(b.titulo, 200);
+  if (!titulo) throw new ErroDeUso("Informe o nome do evento.");
+  const ano = conferirData(b.data);
+  let pontos = null;
+  if (b.tipo !== "avaliacao") {
+    pontos = Math.round(Number(b.pontos));
+    if (!Number.isFinite(pontos) || pontos < 1) throw new ErroDeUso("Informe os Savacoins por pessoa.");
+  }
+
+  const atividade = await transacao(async (c) => {
+    let r;
+    if (id) {
+      const atual = await c.query("SELECT tipo FROM atividades WHERE id = $1", [id]);
+      if (!atual.rowCount) throw new ErroDeUso("Evento não encontrado.", 404);
+      const usados = await c.query("SELECT count(*)::int AS n FROM lancamentos WHERE dados->>'atividadeId' = $1", [id]);
+      if (usados.rows[0].n && atual.rows[0].tipo !== b.tipo) throw new ErroDeUso("Este evento já tem pontos lançados; o tipo não pode mudar.");
+      r = await c.query("UPDATE atividades SET ano = $2, tipo = $3, titulo = $4, data = $5, pontos = $6, descricao = $7 WHERE id = $1 RETURNING *", [
+        id, ano, b.tipo, titulo, b.data, pontos, texto(b.descricao, 1000),
+      ]);
+      // Os lançamentos do evento acompanham a nova data, o ano e o nome.
+      await c.query(
+        `UPDATE lancamentos SET ano = $2, dados = dados || jsonb_build_object('data', $3::text, 'titulo', $4::text)
+         WHERE dados->>'atividadeId' = $1`,
+        [id, ano, b.data, titulo],
+      );
+    } else {
+      r = await c.query("INSERT INTO atividades (id, ano, tipo, titulo, data, pontos, descricao, autor_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *", [
+        uid("a"), ano, b.tipo, titulo, b.data, pontos, texto(b.descricao, 1000), req.usuario.id,
+      ]);
+    }
+    await tocar(c);
+    return atividadeDoBanco(r.rows[0]);
+  });
+  avisarTodos();
+  res.json({ atividade });
+}
+
+rotas.post("/atividades", auth.exigir("admin", "rh"), assincrono(salvarAtividade));
+rotas.put("/atividades/:id", auth.exigir("admin", "rh"), assincrono(salvarAtividade));
+
+rotas.delete("/atividades/:id", auth.exigir("admin", "rh"), assincrono(async (req, res) => {
+  await transacao(async (c) => {
+    const usados = await c.query("SELECT count(*)::int AS n FROM lancamentos WHERE dados->>'atividadeId' = $1", [req.params.id]);
+    if (usados.rows[0].n) throw new ErroDeUso(`Este evento tem ${usados.rows[0].n} lançamento(s). Exclua os lançamentos antes de excluir o evento.`, 409);
+    const r = await c.query("DELETE FROM atividades WHERE id = $1", [req.params.id]);
+    if (!r.rowCount) throw new ErroDeUso("Evento não encontrado.", 404);
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ ok: true });
+}));
+
 // ---------- Lançamentos ----------
 // Confere e normaliza o lançamento enviado pelo front-end (as mesmas regras de sistema.js).
+// Devolve uma lista: na pontuação em lote, quem recebeu valores diferentes vira lançamentos separados.
 async function validarLancamento(b, usuario) {
   const tipo = b.tipo;
   if (!TIPOS_POR_PERFIL[usuario.perfil].includes(tipo)) throw new ErroDeUso("Seu perfil não pode registrar este tipo de lançamento.", 403);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.data || "")) || Number.isNaN(Date.parse(b.data))) throw new ErroDeUso("Informe a data.");
-  // Lançamentos são controlados por ano (o bimestre fica gravado só como referência).
-  const bimestre = R.bimestreDaData(b.data);
-  // Aceita do primeiro ano da Jornada até o ano seguinte ao atual (para já abrir a próxima Jornada).
-  const ano = Number(b.data.slice(0, 4));
-  const limiteAno = new Date().getFullYear() + 1;
-  if (ano < 2025 || ano > limiteAno) throw new ErroDeUso(`Data fora do período da Jornada (2025 a ${limiteAno}). Confira o ano digitado.`);
 
   const { rows } = await pool.query("SELECT id FROM pessoas");
   const existentes = new Set(rows.map((r) => r.id));
-  const dados = { tipo, data: b.data, titulo: texto(b.titulo, 200), bimestre: bimestre?.id || null };
+
+  // Tipos ligados a um evento: data, ano e nome vêm do evento cadastrado.
+  let atividade = null;
+  let jaPontuados = new Set();
+  if (TIPOS_ATIVIDADE.includes(tipo)) {
+    const r = await pool.query("SELECT * FROM atividades WHERE id = $1", [String(b.atividadeId || "")]);
+    atividade = r.rows[0] && atividadeDoBanco(r.rows[0]);
+    if (!atividade) throw new ErroDeUso("Selecione o evento cadastrado.");
+    if (atividade.tipo !== tipo) throw new ErroDeUso("O evento escolhido é de outro tipo.");
+    const { rows: ja } = await pool.query("SELECT dados FROM lancamentos WHERE dados->>'atividadeId' = $1", [atividade.id]);
+    jaPontuados = new Set(ja.flatMap((l) => l.dados.pessoaIds || [l.dados.pessoaId]));
+  }
+  const data = atividade ? atividade.data : String(b.data || "");
+  conferirData(data);
+  const bimestre = R.bimestreDaData(data);
+  const dados = { tipo, data, titulo: atividade ? atividade.titulo : texto(b.titulo, 200), bimestre: bimestre?.id || null };
+  if (atividade) dados.atividadeId = atividade.id;
 
   if (["felicidade", "evento", "missao"].includes(tipo)) {
-    dados.pessoaIds = [...new Set(Array.isArray(b.pessoaIds) ? b.pessoaIds.map(String) : [])];
-    if (!dados.pessoaIds.length) throw new ErroDeUso("Selecione ao menos um participante.");
-    if (dados.pessoaIds.some((id) => !existentes.has(id))) throw new ErroDeUso("Participante não encontrado.");
-    dados.pontos = Math.round(Number(b.pontos ?? (tipo === "felicidade" ? R.pontosPorEncontroFelicidade : 0)));
-    if (!Number.isFinite(dados.pontos) || dados.pontos < 1) throw new ErroDeUso("Informe a pontuação.");
-    if (tipo !== "felicidade" && !dados.titulo) throw new ErroDeUso("Informe o nome.");
-    return dados;
+    const lista = Array.isArray(b.pessoas) ? b.pessoas : [];
+    const porPessoa = new Map();
+    for (const item of lista) {
+      const id = String(item?.id || "");
+      const pontos = Math.round(Number(item?.pontos));
+      if (!existentes.has(id)) throw new ErroDeUso("Participante não encontrado.");
+      if (!Number.isFinite(pontos) || pontos < 1) throw new ErroDeUso("Informe os Savacoins de cada participante marcado.");
+      porPessoa.set(id, pontos);
+    }
+    if (!porPessoa.size) throw new ErroDeUso("Selecione ao menos um participante.");
+    const repetidos = [...porPessoa.keys()].filter((id) => jaPontuados.has(id));
+    if (repetidos.length) throw new ErroDeUso(`${repetidos.length} pessoa(s) já foram pontuadas neste evento.`);
+
+    const grupos = new Map();
+    porPessoa.forEach((pontos, id) => grupos.set(pontos, [...(grupos.get(pontos) || []), id]));
+    return [...grupos].map(([pontos, pessoaIds]) => ({ ...dados, pessoaIds, pontos }));
   }
 
   dados.pessoaId = String(b.pessoaId || "");
   if (!existentes.has(dados.pessoaId)) throw new ErroDeUso("Selecione o colaborador.");
+  if (atividade && jaPontuados.has(dados.pessoaId)) throw new ErroDeUso("Esta pessoa já foi avaliada neste ciclo.");
   dados.justificativa = texto(b.justificativa);
   if (tipo === "indicacao") dados.pontos = R.pontosIndicacao;
   if (tipo === "protagonista" && !dados.justificativa) throw new ErroDeUso("Descreva o motivo da indicação.");
@@ -239,23 +331,25 @@ async function validarLancamento(b, usuario) {
     dados.destaque = texto(b.destaque);
     dados.pontos = Object.values(dados.notas).reduce((a, n) => a + n, 0);
   }
-  return dados;
+  return [dados];
 }
 
 rotas.post("/lancamentos", auth.exigir(), assincrono(async (req, res) => {
-  const dados = await validarLancamento(req.body, req.usuario);
-  const id = uid("l");
-  const ano = Number(dados.data.slice(0, 4));
-  const conteudo = { ...dados, autorNome: req.usuario.nome };
-  const lancamento = await transacao(async (c) => {
-    const { rows } = await c.query("INSERT INTO lancamentos (id, ano, tipo, autor_id, dados) VALUES ($1, $2, $3, $4, $5) RETURNING *", [
-      id, ano, dados.tipo, req.usuario.id, conteudo,
-    ]);
+  const lista = await validarLancamento(req.body, req.usuario);
+  const lancamentos = await transacao(async (c) => {
+    const gravados = [];
+    for (const dados of lista) {
+      const ano = Number(dados.data.slice(0, 4));
+      const { rows } = await c.query("INSERT INTO lancamentos (id, ano, tipo, autor_id, dados) VALUES ($1, $2, $3, $4, $5) RETURNING *", [
+        uid("l"), ano, dados.tipo, req.usuario.id, { ...dados, autorNome: req.usuario.nome },
+      ]);
+      gravados.push(lancamentoDoBanco(rows[0]));
+    }
     await tocar(c);
-    return lancamentoDoBanco(rows[0]);
+    return gravados;
   });
   avisarTodos();
-  res.json({ lancamento });
+  res.json({ lancamentos, lancamento: lancamentos[0] });
 }));
 
 rotas.delete("/lancamentos/:id", auth.exigir(), assincrono(async (req, res) => {
