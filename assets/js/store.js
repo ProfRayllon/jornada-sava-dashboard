@@ -198,10 +198,30 @@
 
   const pontosDoLancamento = R.pontosDoLancamento;
 
+  // Anos com dados: os da base das planilhas, os que já têm lançamento e o ano de referência.
+  function anosDisponiveis() {
+    const anos = new Set([R.anoAtual, ...Object.keys(BASE_PLANILHAS?.years || {}).map(Number)]);
+    (db?.lancamentos || []).forEach((l) => l.ano && anos.add(Number(l.ano)));
+    return [...anos].filter(Boolean).sort((a, b) => b - a);
+  }
+
+  // Ano da Jornada em andamento: o mais recente que tem dados (ex.: 2027 assim que houver um lançamento em 2027).
+  function anoVigente() {
+    return anosDisponiveis()[0];
+  }
+
   // Une a base importada das planilhas com os lançamentos do sistema para um ano.
+  // Num ano sem planilha (ex.: 2027), a pontuação do ano começa do zero, mas o nível
+  // continua acumulando a partir do ano anterior.
   function calcularAno(ano) {
+    ano = Number(ano);
     const dados = db || { pessoas: [], lancamentos: [] };
     const base = dadosBase(ano);
+    const menorAno = Math.min(...anosDisponiveis());
+    const nivelAnterior = new Map();
+    if (!base && ano - 1 >= menorAno) {
+      calcularAno(ano - 1).forEach((l) => nivelAnterior.set(l.pessoa.id, l.levelScore));
+    }
     const basePorChave = new Map((base?.people || []).map((p) => [p.key || normalizar(p.name), p]));
     const lancamentos = dados.lancamentos.filter((l) => l.ano === Number(ano));
     const pilares = ["felicidade", "eventos", "tecnica", "socio", "competencias", "extras"];
@@ -247,7 +267,8 @@
 
         const somaSistema = pilares.reduce((t, k) => t + linha.sistema[k], 0);
         linha.score = linha.base.score + somaSistema;
-        linha.levelScore = (linha.base.levelScore || linha.base.score) + somaSistema;
+        const nivelBase = base ? linha.base.levelScore || linha.base.score : nivelAnterior.get(pessoa.id) || 0;
+        linha.levelScore = nivelBase + somaSistema;
         linha.felicidadeTotal = linha.base.felicidade + linha.sistema.felicidade;
         if (linha.felicidadeTotal >= R.maxFelicidadeCiclo) {
           linha.selos.add("happy");
@@ -276,6 +297,9 @@
     registrarLancamento,
     excluirLancamento,
     pontosDoLancamento,
+    anosDisponiveis,
+    anoVigente,
+    temBase: (ano) => Boolean(dadosBase(ano)),
     calcularAno,
   };
 })();

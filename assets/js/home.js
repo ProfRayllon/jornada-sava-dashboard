@@ -39,6 +39,7 @@
     Promise.resolve(S?.garantirDb())
       .catch(() => {})
       .finally(() => {
+        $$("[data-ano-atual]").forEach((el) => (el.textContent = anoVigente()));
         montarNumeros();
         montarHall();
       });
@@ -76,8 +77,13 @@
   }
 
   // ---------- Números ----------
+  // Ano da Jornada em andamento: o mais recente com dados no sistema (ex.: 2027 após o 1º lançamento).
+  function anoVigente() {
+    return S?.lerDb() ? S.anoVigente() : R.anoAtual;
+  }
+
   function rankingDoAno(ano) {
-    if (Number(ano) === R.anoAtual && S?.lerDb()) {
+    if (S?.lerDb() && (Number(ano) >= R.anoAtual || S.listarLancamentos().some((l) => l.ano === Number(ano)))) {
       return S.calcularAno(ano).map((l) => ({
         name: l.pessoa.nome,
         category: R.categorias[l.pessoa.categoria] || "",
@@ -91,7 +97,7 @@
   }
 
   function montarNumeros() {
-    const ranking = rankingDoAno(R.anoAtual);
+    const ranking = rankingDoAno(anoVigente());
     // Sem a base de dados (ex.: clone do repositório sem a pasta base/), a faixa de números some.
     if (!ranking.length) return ($(".numbers").hidden = true);
     $("#statPessoas").textContent = ranking.length;
@@ -306,8 +312,7 @@
   }
 
   function montarHall() {
-    const anos = Object.keys(window.JORNADA_SAVA_PANEL_DATA?.years || {})
-      .map(Number)
+    const anos = [...new Set([...Object.keys(window.JORNADA_SAVA_PANEL_DATA?.years || {}).map(Number), ...(S?.lerDb() ? S.anosDisponiveis() : [])])]
       .sort((a, b) => b - a);
     const campeoes = anos.map((ano) => ({ ano, p: rankingDoAno(ano)[0] })).filter((c) => c.p);
     if (!campeoes.length) {
@@ -328,7 +333,7 @@
           </div>
           <div>
             <div class="champion-year">${ano}</div>
-            <span class="champion-tag">${ano >= R.anoAtual ? "Destaque do ano · parcial" : "Campeão do ano"}</span>
+            <span class="champion-tag">${ano >= anoVigente() ? "Destaque do ano · parcial" : "Campeão do ano"}</span>
             <h3>${nomeBonito(p.name)}</h3>
             <p class="champion-area">${p.category || ""}</p>
             <div class="champion-score"><strong>${fmt(p.score)}</strong><small>Savacoins</small></div>

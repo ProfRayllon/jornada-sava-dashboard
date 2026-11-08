@@ -93,7 +93,7 @@ const badgeDefinitions = [
 ];
 
 const state = {
-  activeYear: 2026,
+  activeYear: null,
   years: new Map(),
   cumulative: new Map(),
   search: "",
@@ -152,18 +152,18 @@ document.addEventListener("DOMContentLoaded", init);
 async function init() {
   bindEvents();
   restorePreferences();
-  restoreYearFromUrl();
   await window.SAVA_PAINEL_PRONTO;
   await loadAllWorkbooks();
+  restoreYearFromUrl();
   render();
 }
 
 function bindEvents() {
-  document.querySelectorAll("[data-year]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setActiveYear(Number(button.dataset.year));
-      render();
-    });
+  document.querySelector(".segmented-control")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-year]");
+    if (!button) return;
+    setActiveYear(Number(button.dataset.year));
+    render();
   });
 
   els.searchInput.addEventListener("input", (event) => {
@@ -303,7 +303,22 @@ function setTheme(theme) {
 function restoreYearFromUrl() {
   const params = new URLSearchParams(window.location.search);
   const requestedYear = Number(params.get("year") || window.location.hash.replace("#", ""));
-  if ([2025, 2026].includes(requestedYear)) setActiveYear(requestedYear);
+  if (state.years.has(requestedYear)) setActiveYear(requestedYear);
+}
+
+// Uma aba por ano com dados, do mais recente ao mais antigo. O ano mais recente é a Jornada
+// em andamento; os anteriores aparecem como "Resultado".
+function renderYearTabs() {
+  const control = document.querySelector(".segmented-control");
+  const years = [...state.years.keys()].sort((a, b) => b - a);
+  if (!control || !years.length) return;
+  if (!state.years.has(state.activeYear)) state.activeYear = years[0];
+  control.innerHTML = years
+    .map((year, i) => {
+      const active = year === state.activeYear;
+      return `<button class="segment${active ? " active" : ""}" type="button" data-year="${year}" role="tab" aria-selected="${active}">${i === 0 ? year : `Resultado ${year}`}</button>`;
+    })
+    .join("");
 }
 
 function setActiveYear(year) {
@@ -331,6 +346,7 @@ async function loadAllWorkbooks() {
     const loaded = Object.values(processedData.years).map(parseProcessedYear);
     loaded.forEach((yearData) => state.years.set(yearData.year, yearData));
     buildCumulativeTotals();
+    renderYearTabs();
     return;
   }
 
@@ -340,6 +356,7 @@ async function loadAllWorkbooks() {
   );
   loaded.forEach((yearData) => state.years.set(yearData.year, yearData));
   buildCumulativeTotals();
+  renderYearTabs();
 }
 
 async function loadProcessedData() {

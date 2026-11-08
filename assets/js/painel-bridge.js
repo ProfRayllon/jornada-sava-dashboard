@@ -9,13 +9,30 @@
   const selosDoPainel = new Set(["happy", "bright", "inspire"]);
   const reguaSelo = { adm: { bright: 1500, inspire: 2000 }, adv: { bright: 1900, inspire: 2000 } };
 
+  // Anos que o sistema recalcula: o de referência das regras e todo ano com lançamento
+  // (ex.: 2027 ganha sua aba no painel assim que receber o primeiro lançamento).
+  function anosDoSistema(db) {
+    const anos = new Set([R.anoAtual]);
+    db.lancamentos.forEach((l) => l.ano && anos.add(Number(l.ano)));
+    return [...anos];
+  }
+
   function montar() {
     const dados = JSON.parse(JSON.stringify(original));
     const db = S.lerDb();
-    const ano = String(R.anoAtual);
-    if (!db || !dados.years[ano]) return dados;
+    if (!db) return dados;
+    anosDoSistema(db).forEach((ano) => montarAno(dados, db, ano));
+    return dados;
+  }
 
-    dados.years[ano].people = S.calcularAno(R.anoAtual).map((linha) => {
+  function montarAno(dados, db, anoNum) {
+    const ano = String(anoNum);
+    if (!dados.years[ano]) {
+      if (!db.lancamentos.some((l) => Number(l.ano) === anoNum)) return;
+      dados.years[ano] = { year: anoNum, source: "Lançamentos do sistema", updatedAt: db.atualizadoEm, people: [], highlights: [], notes: [] };
+    }
+
+    dados.years[ano].people = S.calcularAno(anoNum).map((linha) => {
       const { pessoa, base, sistema } = linha;
       const badgeScores = { ...linha.badgeScores };
       linha.selos.forEach((selo) => {
@@ -39,8 +56,7 @@
       };
     });
 
-    if (db.lancamentos.length) dados.years[ano].updatedAt = db.atualizadoEm;
-    return dados;
+    if (db.lancamentos.some((l) => Number(l.ano) === anoNum)) dados.years[ano].updatedAt = db.atualizadoEm;
   }
 
   // painel.js espera esta promessa antes de ler JORNADA_SAVA_PANEL_DATA.

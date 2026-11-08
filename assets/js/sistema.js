@@ -63,12 +63,13 @@
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", bimestre: "all", busca: "" }, tipoLancamento: null };
+  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", bimestre: "all", busca: "" }, tipoLancamento: null };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
     state.usuario = S.usuarioAtual();
     if (!state.usuario) return location.replace("login.html");
+    state.ano = S.anoVigente();
 
     const hash = location.hash.slice(1);
     if (views[hash] && podeVer(hash)) state.view = hash;
@@ -80,6 +81,7 @@
     S.ouvir(() => {
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
+      if (!S.anosDisponiveis().includes(state.ano)) state.ano = S.anoVigente();
       if (!$("#modal").classList.contains("open") && !["lancar", "painel"].includes(state.view)) render();
     });
   });
@@ -178,16 +180,42 @@
 
   // ---------------- Painel (ranking oficial, alimentado pelos lançamentos) ----------------
   function renderPainel(el) {
-    if ($("#painelFrame", el)) return;
-    el.innerHTML = `<iframe id="painelFrame" class="painel-frame" src="painel.html" title="Painel da Jornada SAVA"></iframe>`;
+    if ($("#painelFrame", el)?.dataset.ano === String(state.ano)) return;
+    el.innerHTML = `<iframe id="painelFrame" class="painel-frame" src="painel.html?year=${state.ano}" data-ano="${state.ano}" title="Painel da Jornada SAVA"></iframe>`;
+  }
+
+  // ---------------- Ano da Jornada ----------------
+  // O sistema mostra o ano mais recente com dados; o seletor permite consultar os anteriores.
+  function seletorAno(id) {
+    return `<select id="${id}" class="year-select" aria-label="Ano da Jornada">${S.anosDisponiveis()
+      .map((a) => `<option value="${a}" ${a === state.ano ? "selected" : ""}>Jornada ${a}</option>`)
+      .join("")}</select>`;
+  }
+
+  function ligarSeletorAno(el, id, rerender) {
+    $(`#${id}`, el)?.addEventListener("change", (e) => {
+      state.ano = Number(e.target.value);
+      rerender(el);
+    });
+  }
+
+  // Bimestre usado nos indicadores: o de hoje no ano corrente; num ano futuro, o último com lançamento
+  // (ou o 1º); num ano já encerrado, o 5º.
+  function bimestreReferencia(ano, lancs) {
+    const hoje = hojeIso();
+    const anoHoje = Number(hoje.slice(0, 4));
+    if (ano === anoHoje) return R.bimestreDaData(hoje);
+    if (ano < anoHoje) return R.bimestres[R.bimestres.length - 1];
+    const ultimo = Math.max(1, ...lancs.map((l) => l.bimestre || 1));
+    return R.bimestres.find((b) => b.id === ultimo);
   }
 
   // ---------------- Visão geral ----------------
   function renderVisao(el) {
-    const ano = R.anoAtual;
+    const ano = state.ano;
     const linhas = S.calcularAno(ano);
-    const bimAtual = R.bimestreDaData(hojeIso());
     const lancs = S.listarLancamentos().filter((l) => l.ano === ano);
+    const bimAtual = bimestreReferencia(ano, lancs);
     const doBim = bimAtual ? lancs.filter((l) => l.bimestre === bimAtual.id) : [];
     const avaliados = new Set(doBim.filter((l) => l.tipo === "avaliacao").map((l) => l.pessoaId));
     const avaliaveis = linhas.filter((l) => l.pessoa.categoria);
@@ -214,8 +242,9 @@
       <section class="grid-main">
         <div class="card">
           <div class="card-head">
-            <div><h2>Ranking ao vivo · ${ano}</h2><p class="muted">Base das planilhas + lançamentos do sistema. Clique para ver o progresso.</p></div>
+            <div><h2>Ranking ao vivo · ${ano}</h2><p class="muted">${S.temBase(ano) ? "Base das planilhas + lançamentos do sistema" : "Lançamentos feitos no sistema"}. Clique para ver o progresso.</p></div>
             <div class="filters">
+              ${seletorAno("fAno")}
               <input type="search" id="fBusca" placeholder="Buscar pessoa" value="${esc(state.filtros.busca)}" />
               <select id="fArea">
                 <option value="all">Todas as áreas</option>
@@ -300,6 +329,7 @@
       state.filtros.area = e.target.value;
       renderVisao(el);
     });
+    ligarSeletorAno(el, "fAno", renderVisao);
     el.querySelector("tbody").addEventListener("click", (e) => {
       const tr = e.target.closest("[data-pessoa]");
       if (tr) abrirPessoa(tr.dataset.pessoa);
@@ -345,7 +375,7 @@
 
   // ---------------- Ficha da pessoa ----------------
   function abrirPessoa(id) {
-    const linhas = S.calcularAno(R.anoAtual);
+    const linhas = S.calcularAno(state.ano);
     const l = linhas.find((x) => x.pessoa.id === id);
     if (!l) return;
     const pos = linhas.indexOf(l) + 1;
@@ -364,7 +394,7 @@
       </header>
       <section class="drawer-stats">
         <div><span>Posição</span><strong>${pos}º</strong></div>
-        <div><span>Savacoins ${R.anoAtual}</span><strong>${fmt(l.score)}</strong></div>
+        <div><span>Savacoins ${state.ano}</span><strong>${fmt(l.score)}</strong></div>
         <div><span>Total acumulado</span><strong>${fmt(l.levelScore)}</strong></div>
       </section>
       <section class="drawer-sec">
@@ -381,7 +411,7 @@
             <div class="lv-track"><i style="width:${l.score ? (v[p.id] / l.score) * 100 : 0}%;background:${p.cor}"></i></div></div>`,
           )
           .join("")}
-        <p class="muted small">Inclui a base importada das planilhas (até 07/2026) e os lançamentos do sistema.</p>
+        <p class="muted small">${S.temBase(state.ano) ? "Inclui a base importada das planilhas e os lançamentos do sistema." : `Pontos lançados no sistema em ${state.ano}. O total acumulado soma os anos anteriores.`}</p>
       </section>
       <section class="drawer-sec">
         <h3>Selos conquistados</h3>
@@ -447,7 +477,21 @@
   }
 
   function campoData() {
-    return `<label class="field"><span>Data</span><input type="date" name="data" required value="${hojeIso()}" /></label>`;
+    return `<label class="field"><span>Data</span><input type="date" name="data" required value="${hojeIso()}" /><small class="field-hint" id="dataInfo"></small></label>`;
+  }
+
+  // Mostra em que ano e bimestre da Jornada a pontuação vai entrar.
+  function ligarData(form) {
+    const input = $('input[name="data"]', form);
+    const info = $("#dataInfo", form);
+    if (!input || !info) return;
+    const atualizar = () => {
+      const bim = input.value && R.bimestreDaData(input.value);
+      info.classList.toggle("warn", !bim);
+      info.textContent = !input.value ? "" : bim ? `Entra na Jornada ${input.value.slice(0, 4)} · ${bim.nome}` : "Dezembro e janeiro não pontuam.";
+    };
+    input.addEventListener("input", atualizar);
+    atualizar();
   }
 
   function campoChecklist() {
@@ -537,6 +581,7 @@
       <div class="form-actions"><button type="submit" class="btn btn-gold">Registrar lançamento</button></div>`;
 
     if ($("#checklist", form)) ligarChecklist(form);
+    ligarData(form);
     if (tipo === "avaliacao") {
       $$("[data-cat]", form).forEach((b) =>
         b.addEventListener("click", () => {
@@ -653,7 +698,8 @@
       return (erro.textContent = err.message);
     }
     state.pessoaPreSelecionada = null;
-    toast(`${tipos[tipo].nome} registrado. Painel atualizado.`);
+    state.ano = Number(data.slice(0, 4));
+    toast(`${tipos[tipo].nome} registrado na Jornada ${state.ano} · ${bim.nome}. Painel atualizado.`);
     renderLancar($("#content"));
   }
 
@@ -662,7 +708,7 @@
     const u = state.usuario;
     const pessoas = new Map(S.listarPessoas().map((p) => [p.id, p]));
     const todos = S.listarLancamentos()
-      .filter((l) => l.ano === R.anoAtual)
+      .filter((l) => l.ano === state.ano)
       .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
     const f = state.hist;
     const lista = todos.filter((l) => {
@@ -679,8 +725,9 @@
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>${fmt(lista.length)} lançamento(s)</h2><p class="muted">Registros feitos pelo sistema em ${R.anoAtual}.</p></div>
+          <div><h2>${fmt(lista.length)} lançamento(s)</h2><p class="muted">Registros feitos pelo sistema em ${state.ano}.</p></div>
           <div class="filters">
+            ${seletorAno("hAno")}
             <input type="search" id="hBusca" placeholder="Pessoa, título ou autor" value="${esc(f.busca)}" />
             <select id="hTipo"><option value="all">Todos os tipos</option>${Object.entries(tipos).map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`).join("")}</select>
             <select id="hBim"><option value="all">Todos os bimestres</option>${R.bimestres.map((b) => `<option value="${b.id}" ${f.bimestre === String(b.id) ? "selected" : ""}>${b.nome}</option>`).join("")}</select>
@@ -713,6 +760,7 @@
     $("#hBusca", el).addEventListener("change", (e) => ((f.busca = e.target.value), renderHistorico(el)));
     $("#hTipo", el).addEventListener("change", (e) => ((f.tipo = e.target.value), renderHistorico(el)));
     $("#hBim", el).addEventListener("change", (e) => ((f.bimestre = e.target.value), renderHistorico(el)));
+    ligarSeletorAno(el, "hAno", renderHistorico);
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
         if (!confirm("Excluir este lançamento? A pontuação será removida do painel.")) return;

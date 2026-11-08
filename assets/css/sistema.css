@@ -129,6 +129,9 @@ img { max-width: 100%; }
   box-shadow: 0 0 0 3px rgba(212, 178, 111, 0.2);
   background: var(--surface);
 }
+.field-hint { font-size: 0.74rem; font-weight: 600; color: var(--gold-deep); min-height: 1.1em; }
+.field-hint.warn { color: var(--danger); }
+.filters select.year-select { min-width: 140px; font-weight: 700; }
 .form-error { min-height: 1.2em; color: var(--danger); font-size: 0.82rem; font-weight: 600; }
 .check-line { display: flex; align-items: center; gap: 10px; font-size: 0.86rem; }
 .check-line input { width: 18px; height: 18px; accent-color: var(--gold-deep); }

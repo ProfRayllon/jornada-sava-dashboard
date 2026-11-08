@@ -200,6 +200,10 @@ async function validarLancamento(b, usuario) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.data || "")) || Number.isNaN(Date.parse(b.data))) throw new ErroDeUso("Informe a data.");
   const bimestre = R.bimestreDaData(b.data);
   if (!bimestre) throw new ErroDeUso("Dezembro e janeiro são meses sem pontuação na Jornada SAVA.");
+  // Aceita do primeiro ano da Jornada até o ano seguinte ao atual (para já abrir a próxima Jornada).
+  const ano = Number(b.data.slice(0, 4));
+  const limiteAno = new Date().getFullYear() + 1;
+  if (ano < 2025 || ano > limiteAno) throw new ErroDeUso(`Data fora do período da Jornada (2025 a ${limiteAno}). Confira o ano digitado.`);
 
   const { rows } = await pool.query("SELECT id FROM pessoas");
   const existentes = new Set(rows.map((r) => r.id));
