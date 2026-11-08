@@ -270,7 +270,7 @@
         const nivelBase = base ? linha.base.levelScore || linha.base.score : nivelAnterior.get(pessoa.id) || 0;
         linha.levelScore = nivelBase + somaSistema;
         linha.felicidadeTotal = linha.base.felicidade + linha.sistema.felicidade;
-        if (linha.felicidadeTotal >= R.maxFelicidadeCiclo) {
+        if (linha.felicidadeTotal >= R.maxFelicidadeAno) {
           linha.selos.add("happy");
           linha.badgeScores.happy = linha.felicidadeTotal;
         }

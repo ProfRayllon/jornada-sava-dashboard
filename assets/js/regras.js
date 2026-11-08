@@ -157,9 +157,11 @@
 
   window.SAVA_REGRAS = {
     anoAtual: 2026,
+    // Os lançamentos são controlados por ano: cada pilar tem um teto anual igual para todos,
+    // alcançado pela soma dos encontros, eventos e avaliações realizados ao longo do ano.
     pontosPorEncontroFelicidade: 575,
-    maxFelicidadeCiclo: 2300,
-    maxEventosBimestre: 700,
+    maxFelicidadeAno: 2300,
+    maxEventosAno: 700,
     pontosIndicacao: 500,
     categorias,
     criterios,

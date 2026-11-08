@@ -39,8 +39,8 @@
   };
 
   const tipos = {
-    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros (575 Savacoins por encontro).", cor: "#9d2824", icone: ico("felicidade") },
-    evento: { nome: "Evento institucional", desc: "Frequência em eventos (até 700 Savacoins no bimestre).", cor: "#3a3c39", icone: ico("evento") },
+    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros (até 2.300 Savacoins no ano).", cor: "#9d2824", icone: ico("felicidade") },
+    evento: { nome: "Evento institucional", desc: "Frequência em eventos (até 700 Savacoins no ano).", cor: "#3a3c39", icone: ico("evento") },
     avaliacao: { nome: "Avaliação do líder", desc: "Técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
     indicacao: { nome: "Indicação de negócio", desc: "Informada pelos sócios — 500 Savacoins (ADV).", cor: "#2f7a5b", icone: ico("indicacao") },
     missao: { nome: "Missão secreta", desc: "Missões divulgadas previamente pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
@@ -63,7 +63,7 @@
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", bimestre: "all", busca: "" }, tipoLancamento: null };
+  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", busca: "" }, tipoLancamento: null };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
@@ -199,15 +199,18 @@
     });
   }
 
-  // Bimestre usado nos indicadores: o de hoje no ano corrente; num ano futuro, o último com lançamento
-  // (ou o 1º); num ano já encerrado, o 5º.
-  function bimestreReferencia(ano, lancs) {
-    const hoje = hojeIso();
-    const anoHoje = Number(hoje.slice(0, 4));
-    if (ano === anoHoje) return R.bimestreDaData(hoje);
-    if (ano < anoHoje) return R.bimestres[R.bimestres.length - 1];
-    const ultimo = Math.max(1, ...lancs.map((l) => l.bimestre || 1));
-    return R.bimestres.find((b) => b.id === ultimo);
+  // Quantas avaliações a pessoa já recebeu no ano (para numerar 1ª, 2ª… avaliação).
+  function avaliacoesNoAno(pessoaId, ano) {
+    return S.listarLancamentos()
+      .filter((l) => l.tipo === "avaliacao" && l.pessoaId === pessoaId && l.ano === ano)
+      .sort((a, b) => a.data.localeCompare(b.data) || a.criadoEm.localeCompare(b.criadoEm));
+  }
+
+  // Soma do que cada pessoa já recebeu no ano num tipo de lançamento coletivo.
+  function somaNoAno(tipo, pessoaId, ano) {
+    return S.listarLancamentos()
+      .filter((l) => l.tipo === tipo && l.ano === ano && l.pessoaIds?.includes(pessoaId))
+      .reduce((t, l) => t + Number(l.pontos || 0), 0);
   }
 
   // ---------------- Visão geral ----------------
@@ -215,9 +218,8 @@
     const ano = state.ano;
     const linhas = S.calcularAno(ano);
     const lancs = S.listarLancamentos().filter((l) => l.ano === ano);
-    const bimAtual = bimestreReferencia(ano, lancs);
-    const doBim = bimAtual ? lancs.filter((l) => l.bimestre === bimAtual.id) : [];
-    const avaliados = new Set(doBim.filter((l) => l.tipo === "avaliacao").map((l) => l.pessoaId));
+    const avaliacoes = lancs.filter((l) => l.tipo === "avaliacao");
+    const avaliados = new Set(avaliacoes.map((l) => l.pessoaId));
     const avaliaveis = linhas.filter((l) => l.pessoa.categoria);
     const pendentes = avaliaveis.filter((l) => !avaliados.has(l.pessoa.id));
     const totalCoins = linhas.reduce((t, l) => t + l.score, 0);
@@ -235,8 +237,8 @@
       <section class="kpis">
         ${kpi("Colaboradores na jornada", fmt(linhas.length), `${linhas.filter((l) => l.pessoa.categoria === "adv").length} ADV · ${linhas.filter((l) => l.pessoa.categoria === "adm").length} ADM`)}
         ${kpi(`Savacoins em ${ano}`, fmt(totalCoins), `${fmt(lancs.length)} lançamentos no sistema`)}
-        ${kpi("Lançamentos no bimestre", fmt(doBim.length), bimAtual ? bimAtual.nome : "Fora do período")}
-        ${kpi("Cobertura de avaliações", `${cobertura}%`, `${pendentes.length} pendente(s) no bimestre`, cobertura)}
+        ${kpi(`Avaliações em ${ano}`, fmt(avaliacoes.length), `${fmt(avaliados.size)} pessoa(s) avaliada(s)`)}
+        ${kpi("Cobertura de avaliações", `${cobertura}%`, `${pendentes.length} sem avaliação em ${ano}`, cobertura)}
       </section>
 
       <section class="grid-main">
@@ -279,8 +281,8 @@
 
         <div class="stack">
           <div class="card">
-            <div class="card-head"><h2>Pendências do bimestre</h2><span class="chip">${pendentes.length}</span></div>
-            <p class="muted small">Colaboradores ainda sem avaliação ${bimAtual ? `no ${bimAtual.nome}` : ""}.</p>
+            <div class="card-head"><h2>Sem avaliação no ano</h2><span class="chip">${pendentes.length}</span></div>
+            <p class="muted small">Colaboradores ainda sem nenhuma avaliação em ${ano}.</p>
             <ul class="mini-list">
               ${pendentes
                 .slice(0, 8)
@@ -480,15 +482,13 @@
     return `<label class="field"><span>Data</span><input type="date" name="data" required value="${hojeIso()}" /><small class="field-hint" id="dataInfo"></small></label>`;
   }
 
-  // Mostra em que ano e bimestre da Jornada a pontuação vai entrar.
+  // Mostra em que ano da Jornada a pontuação vai entrar.
   function ligarData(form) {
     const input = $('input[name="data"]', form);
     const info = $("#dataInfo", form);
     if (!input || !info) return;
     const atualizar = () => {
-      const bim = input.value && R.bimestreDaData(input.value);
-      info.classList.toggle("warn", !bim);
-      info.textContent = !input.value ? "" : bim ? `Entra na Jornada ${input.value.slice(0, 4)} · ${bim.nome}` : "Dezembro e janeiro não pontuam.";
+      info.textContent = input.value ? `Entra na Jornada ${input.value.slice(0, 4)}` : "";
     };
     input.addEventListener("input", atualizar);
     atualizar();
@@ -524,12 +524,12 @@
     if (tipo === "felicidade") {
       corpo = `${campoData()}
         <label class="field"><span>Encontro</span><input name="titulo" placeholder="Ex.: Café da felicidade" /></label>
-        <div class="field"><span>Pontuação por pessoa</span><div class="static-value">${fmt(R.pontosPorEncontroFelicidade)} Savacoins</div></div>
+        <label class="field"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" max="${R.maxFelicidadeAno}" step="25" required value="${R.pontosPorEncontroFelicidade}" /></label>
         ${campoChecklist()}`;
     } else if (tipo === "evento") {
       corpo = `${campoData()}
         <label class="field"><span>Nome do evento</span><input name="titulo" required placeholder="Ex.: Aniversariante do Mês" /></label>
-        <label class="field"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" max="${R.maxEventosBimestre}" step="25" required value="350" /></label>
+        <label class="field"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" max="${R.maxEventosAno}" step="25" required value="350" /></label>
         ${campoChecklist()}`;
     } else if (tipo === "missao") {
       corpo = `${campoData()}
@@ -648,27 +648,22 @@
     const fd = new FormData(form);
     const data = fd.get("data");
     if (!data) return (erro.textContent = "Informe a data.");
-    const bim = R.bimestreDaData(data);
-    if (!bim) return (erro.textContent = "Dezembro e janeiro são meses sem pontuação na Jornada SAVA.");
+    const ano = Number(data.slice(0, 4));
 
     const dados = { tipo, data, titulo: (fd.get("titulo") || "").trim() };
-    const lancsBim = S.listarLancamentos().filter((l) => l.ano === Number(data.slice(0, 4)) && l.bimestre === bim.id);
     const avisos = [];
 
     if (["felicidade", "evento", "missao"].includes(tipo)) {
       dados.pessoaIds = fd.getAll("pessoas");
       if (!dados.pessoaIds.length) return (erro.textContent = "Selecione ao menos um participante.");
-      dados.pontos = tipo === "felicidade" ? R.pontosPorEncontroFelicidade : Number(fd.get("pontos"));
+      dados.pontos = Number(fd.get("pontos"));
       if (!dados.pontos || dados.pontos < 1) return (erro.textContent = "Informe a pontuação.");
       if (tipo !== "felicidade" && !dados.titulo) return (erro.textContent = "Informe o nome.");
 
-      const limite = tipo === "felicidade" ? R.maxFelicidadeCiclo : tipo === "evento" ? R.maxEventosBimestre : null;
+      const limite = tipo === "felicidade" ? R.maxFelicidadeAno : tipo === "evento" ? R.maxEventosAno : null;
       if (limite) {
-        const acima = dados.pessoaIds.filter((id) => {
-          const ja = lancsBim.filter((l) => l.tipo === tipo && l.pessoaIds?.includes(id)).reduce((t, l) => t + l.pontos, 0);
-          return ja + dados.pontos > limite;
-        });
-        if (acima.length) avisos.push(`${acima.length} pessoa(s) ultrapassariam o limite de ${fmt(limite)} Savacoins de ${tipos[tipo].nome.toLowerCase()} no ${bim.nome}.`);
+        const acima = dados.pessoaIds.filter((id) => somaNoAno(tipo, id, ano) + dados.pontos > limite);
+        if (acima.length) avisos.push(`${acima.length} pessoa(s) passariam do teto de ${fmt(limite)} Savacoins de ${tipos[tipo].nome.toLowerCase()} em ${ano}.`);
       }
     } else {
       dados.pessoaId = fd.get("pessoaId");
@@ -684,9 +679,8 @@
         dados.feedback = (fd.get("feedback") || "").trim();
         dados.destaque = (fd.get("destaque") || "").trim();
         dados.pontos = Object.values(dados.notas).reduce((a, b) => a + b, 0);
-        if (lancsBim.some((l) => l.tipo === "avaliacao" && l.pessoaId === dados.pessoaId)) {
-          avisos.push(`Esta pessoa já tem avaliação registrada no ${bim.nome}.`);
-        }
+        const anteriores = avaliacoesNoAno(dados.pessoaId, ano).length;
+        if (anteriores) avisos.push(`Esta pessoa já tem ${anteriores} avaliação(ões) em ${ano}. Esta será a ${anteriores + 1}ª avaliação do ano.`);
       }
     }
 
@@ -698,8 +692,8 @@
       return (erro.textContent = err.message);
     }
     state.pessoaPreSelecionada = null;
-    state.ano = Number(data.slice(0, 4));
-    toast(`${tipos[tipo].nome} registrado na Jornada ${state.ano} · ${bim.nome}. Painel atualizado.`);
+    state.ano = ano;
+    toast(`${tipos[tipo].nome} registrado na Jornada ${ano}. Painel atualizado.`);
     renderLancar($("#content"));
   }
 
@@ -713,7 +707,6 @@
     const f = state.hist;
     const lista = todos.filter((l) => {
       if (f.tipo !== "all" && l.tipo !== f.tipo) return false;
-      if (f.bimestre !== "all" && String(l.bimestre) !== f.bimestre) return false;
       if (f.busca) {
         const q = S.normalizar(f.busca);
         const nomes = (l.pessoaIds || [l.pessoaId]).map((id) => pessoas.get(id)?.nome || "").join(" ");
@@ -730,7 +723,6 @@
             ${seletorAno("hAno")}
             <input type="search" id="hBusca" placeholder="Pessoa, título ou autor" value="${esc(f.busca)}" />
             <select id="hTipo"><option value="all">Todos os tipos</option>${Object.entries(tipos).map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`).join("")}</select>
-            <select id="hBim"><option value="all">Todos os bimestres</option>${R.bimestres.map((b) => `<option value="${b.id}" ${f.bimestre === String(b.id) ? "selected" : ""}>${b.nome}</option>`).join("")}</select>
           </div>
         </div>
         <div class="table-wrap">
@@ -742,8 +734,8 @@
                   const podeExcluir = u.perfil !== "lider" || l.autorId === u.id;
                   const nomes = (l.pessoaIds || [l.pessoaId]).map((id) => nomeBonito(pessoas.get(id)?.nome || "Removido"));
                   return `<tr>
-                    <td>${dataBr(l.data)}<small>${R.bimestres.find((b) => b.id === l.bimestre)?.nome || ""}</small></td>
-                    <td><span class="type-tag" style="--c:${tipos[l.tipo].cor}">${tipos[l.tipo].icone} ${tipos[l.tipo].nome}</span>${l.titulo ? `<small>${esc(l.titulo)}</small>` : ""}</td>
+                    <td>${dataBr(l.data)}</td>
+                    <td><span class="type-tag" style="--c:${tipos[l.tipo].cor}">${tipos[l.tipo].icone} ${tipos[l.tipo].nome}</span>${l.tipo === "avaliacao" ? `<small>${avaliacoesNoAno(l.pessoaId, l.ano).findIndex((x) => x.id === l.id) + 1}ª avaliação do ano</small>` : ""}${l.titulo ? `<small>${esc(l.titulo)}</small>` : ""}</td>
                     <td>${nomes.length > 2 ? `<span title="${esc(nomes.join(", "))}">${esc(nomes.slice(0, 2).join(", "))} +${nomes.length - 2}</span>` : esc(nomes.join(", "))}
                       ${l.feedback ? `<small class="clip">“${esc(l.feedback)}”</small>` : ""}${l.justificativa ? `<small class="clip">${esc(l.justificativa)}</small>` : ""}</td>
                     <td class="num">${l.pontos ? `${fmt(l.pontos)}${l.pessoaIds?.length > 1 ? `<small>por pessoa</small>` : ""}` : "Selo"}</td>
@@ -759,7 +751,6 @@
 
     $("#hBusca", el).addEventListener("change", (e) => ((f.busca = e.target.value), renderHistorico(el)));
     $("#hTipo", el).addEventListener("change", (e) => ((f.tipo = e.target.value), renderHistorico(el)));
-    $("#hBim", el).addEventListener("change", (e) => ((f.bimestre = e.target.value), renderHistorico(el)));
     ligarSeletorAno(el, "hAno", renderHistorico);
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
@@ -850,7 +841,7 @@
         <div class="roles">
           <div><b>Administrador</b><small>Tudo, inclusive equipe e acessos.</small></div>
           <div><b>RH</b><small>Presenças, eventos, missões, indicações, avaliações e cadastro de colaboradores.</small></div>
-          <div><b>Líder avaliador</b><small>Avaliações bimestrais dos colaboradores.</small></div>
+          <div><b>Líder avaliador</b><small>Avaliações dos colaboradores ao longo do ano.</small></div>
         </div>
         <div class="table-wrap">
           <table class="table">

@@ -198,8 +198,8 @@ async function validarLancamento(b, usuario) {
   const tipo = b.tipo;
   if (!TIPOS_POR_PERFIL[usuario.perfil].includes(tipo)) throw new ErroDeUso("Seu perfil não pode registrar este tipo de lançamento.", 403);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(b.data || "")) || Number.isNaN(Date.parse(b.data))) throw new ErroDeUso("Informe a data.");
+  // Lançamentos são controlados por ano (o bimestre fica gravado só como referência).
   const bimestre = R.bimestreDaData(b.data);
-  if (!bimestre) throw new ErroDeUso("Dezembro e janeiro são meses sem pontuação na Jornada SAVA.");
   // Aceita do primeiro ano da Jornada até o ano seguinte ao atual (para já abrir a próxima Jornada).
   const ano = Number(b.data.slice(0, 4));
   const limiteAno = new Date().getFullYear() + 1;
@@ -207,13 +207,13 @@ async function validarLancamento(b, usuario) {
 
   const { rows } = await pool.query("SELECT id FROM pessoas");
   const existentes = new Set(rows.map((r) => r.id));
-  const dados = { tipo, data: b.data, titulo: texto(b.titulo, 200), bimestre: bimestre.id };
+  const dados = { tipo, data: b.data, titulo: texto(b.titulo, 200), bimestre: bimestre?.id || null };
 
   if (["felicidade", "evento", "missao"].includes(tipo)) {
     dados.pessoaIds = [...new Set(Array.isArray(b.pessoaIds) ? b.pessoaIds.map(String) : [])];
     if (!dados.pessoaIds.length) throw new ErroDeUso("Selecione ao menos um participante.");
     if (dados.pessoaIds.some((id) => !existentes.has(id))) throw new ErroDeUso("Participante não encontrado.");
-    dados.pontos = tipo === "felicidade" ? R.pontosPorEncontroFelicidade : Math.round(Number(b.pontos));
+    dados.pontos = Math.round(Number(b.pontos ?? (tipo === "felicidade" ? R.pontosPorEncontroFelicidade : 0)));
     if (!Number.isFinite(dados.pontos) || dados.pontos < 1) throw new ErroDeUso("Informe a pontuação.");
     if (tipo !== "felicidade" && !dados.titulo) throw new ErroDeUso("Informe o nome.");
     return dados;
