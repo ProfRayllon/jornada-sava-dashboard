@@ -42,7 +42,7 @@
     felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros (até 2.300 Savacoins no ano).", cor: "#9d2824", icone: ico("felicidade") },
     evento: { nome: "Evento institucional", desc: "Frequência em eventos (até 700 Savacoins no ano).", cor: "#3a3c39", icone: ico("evento") },
     avaliacao: { nome: "Avaliação do líder", desc: "Técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
-    indicacao: { nome: "Indicação de negócio", desc: "Informada pelos sócios — 500 Savacoins (ADV).", cor: "#2f7a5b", icone: ico("indicacao") },
+    indicacao: { nome: "Indicação de negócio", desc: "Bônus de 500 Savacoins, exclusivo dos advogados.", cor: "#2f7a5b", icone: ico("indicacao") },
     missao: { nome: "Missão secreta", desc: "Missões divulgadas previamente pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
     protagonista: { nome: "Selo Sou Protagonista", desc: "Indicação do líder por inovação, melhoria ou inspiração.", cor: "#b08a3e", icone: ico("protagonista") },
   };
@@ -63,7 +63,7 @@
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", busca: "" }, tipoLancamento: null };
+  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, tipoLancamento: null };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
@@ -478,18 +478,47 @@
       .sort((a, b) => a.nome.localeCompare(b.nome));
   }
 
+  // Anos em que se pode lançar: os que já têm dados e o próximo (para abrir a Jornada seguinte).
+  function anosParaLancar() {
+    const proximo = Number(hojeIso().slice(0, 4)) + 1;
+    return [...new Set([proximo, ...S.anosDisponiveis()])].filter((a) => a >= 2025 && a <= proximo).sort((a, b) => b - a);
+  }
+
+  // Data sugerida dentro do ano escolhido: hoje, se for o ano corrente; senão o início ou o fim do ano.
+  function dataPadrao(ano) {
+    const hoje = hojeIso();
+    const anoHoje = Number(hoje.slice(0, 4));
+    return ano === anoHoje ? hoje : ano > anoHoje ? `${ano}-01-01` : `${ano}-12-31`;
+  }
+
   function campoData() {
-    return `<label class="field"><span>Data</span><input type="date" name="data" required value="${hojeIso()}" /><small class="field-hint" id="dataInfo"></small></label>`;
+    const ano = anosParaLancar().includes(state.ano) ? state.ano : anosParaLancar()[0];
+    return `
+      <label class="field"><span>Jornada (ano)</span><select name="anoJornada" class="year-pick">${anosParaLancar()
+        .map((a) => `<option value="${a}" ${a === ano ? "selected" : ""}>Jornada ${a}</option>`)
+        .join("")}</select></label>
+      <label class="field"><span>Data</span><input type="date" name="data" required value="${dataPadrao(ano)}" min="${ano}-01-01" max="${ano}-12-31" /><small class="field-hint" id="dataInfo"></small></label>`;
   }
 
   // Mostra em que ano da Jornada a pontuação vai entrar.
   function ligarData(form) {
     const input = $('input[name="data"]', form);
     const info = $("#dataInfo", form);
-    if (!input || !info) return;
+    const anoSel = $('select[name="anoJornada"]', form);
+    if (!input || !info || !anoSel) return;
     const atualizar = () => {
-      info.textContent = input.value ? `Entra na Jornada ${input.value.slice(0, 4)}` : "";
+      const fora = input.value && input.value.slice(0, 4) !== anoSel.value;
+      info.classList.toggle("warn", Boolean(fora));
+      info.textContent = !input.value ? "" : fora ? `A data precisa ser de ${anoSel.value}.` : `Entra na Jornada ${anoSel.value}`;
     };
+    anoSel.addEventListener("change", () => {
+      const ano = Number(anoSel.value);
+      state.ano = ano;
+      input.min = `${ano}-01-01`;
+      input.max = `${ano}-12-31`;
+      input.value = dataPadrao(ano);
+      atualizar();
+    });
     input.addEventListener("input", atualizar);
     atualizar();
   }
@@ -649,6 +678,7 @@
     const data = fd.get("data");
     if (!data) return (erro.textContent = "Informe a data.");
     const ano = Number(data.slice(0, 4));
+    if (String(ano) !== fd.get("anoJornada")) return (erro.textContent = `A data precisa ser de ${fd.get("anoJornada")}, o ano da Jornada escolhido.`);
 
     const dados = { tipo, data, titulo: (fd.get("titulo") || "").trim() };
     const avisos = [];
@@ -702,7 +732,7 @@
     const u = state.usuario;
     const pessoas = new Map(S.listarPessoas().map((p) => [p.id, p]));
     const todos = S.listarLancamentos()
-      .filter((l) => l.ano === state.ano)
+      .filter((l) => state.hist.todosAnos || l.ano === state.ano)
       .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
     const f = state.hist;
     const lista = todos.filter((l) => {
@@ -718,9 +748,11 @@
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>${fmt(lista.length)} lançamento(s)</h2><p class="muted">Registros feitos pelo sistema em ${state.ano}.</p></div>
+          <div><h2>${fmt(lista.length)} lançamento(s)</h2><p class="muted">Registros gravados no sistema ${state.hist.todosAnos ? "em todos os anos" : `em ${state.ano}`}.</p></div>
           <div class="filters">
-            ${seletorAno("hAno")}
+            <select id="hAno" class="year-select" aria-label="Ano da Jornada"><option value="all" ${state.hist.todosAnos ? "selected" : ""}>Todos os anos</option>${S.anosDisponiveis()
+              .map((a) => `<option value="${a}" ${!state.hist.todosAnos && a === state.ano ? "selected" : ""}>Jornada ${a}</option>`)
+              .join("")}</select>
             <input type="search" id="hBusca" placeholder="Pessoa, título ou autor" value="${esc(f.busca)}" />
             <select id="hTipo"><option value="all">Todos os tipos</option>${Object.entries(tipos).map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`).join("")}</select>
           </div>
@@ -751,7 +783,11 @@
 
     $("#hBusca", el).addEventListener("change", (e) => ((f.busca = e.target.value), renderHistorico(el)));
     $("#hTipo", el).addEventListener("change", (e) => ((f.tipo = e.target.value), renderHistorico(el)));
-    ligarSeletorAno(el, "hAno", renderHistorico);
+    $("#hAno", el).addEventListener("change", (e) => {
+      state.hist.todosAnos = e.target.value === "all";
+      if (!state.hist.todosAnos) state.ano = Number(e.target.value);
+      renderHistorico(el);
+    });
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
         if (!confirm("Excluir este lançamento? A pontuação será removida do painel.")) return;

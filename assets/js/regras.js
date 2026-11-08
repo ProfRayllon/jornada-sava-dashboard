@@ -34,13 +34,13 @@
       { nome: "Participação no Programa de Felicidade", desc: "Ações de bem-estar, qualidade de vida e engajamento.", pontos: 2300, prefixo: "até", medicao: "Frequência nas atividades (RH)", icone: "heart" },
       { nome: "Eventos institucionais", desc: "Participação em eventos, treinamentos e iniciativas.", pontos: 700, prefixo: "até", medicao: "Frequência nas atividades (RH)", icone: "calendar" },
       { nome: "Avaliação técnica", desc: "Desempenho e qualidade nas entregas.", pontos: 1500, prefixo: "até", medicao: "Avaliação dos líderes", icone: "chart" },
-      { nome: "Avaliação socioemocional", desc: "Comportamento, colaboração e atitudes.", pontos: 2500, prefixo: "até", medicao: "Avaliação dos líderes", icone: "users" },
+      { nome: "Avaliação socioemocional", desc: "Comportamento, colaboração e atitudes.", pontos: 2000, prefixo: "até", medicao: "Avaliação dos líderes", icone: "users" },
     ],
     adv: [
       { nome: "Participação no Programa de Felicidade", desc: "Ações de bem-estar, qualidade de vida e engajamento.", pontos: 2300, prefixo: "até", medicao: "Frequência nas atividades (RH)", icone: "heart" },
       { nome: "Eventos institucionais", desc: "Participação em eventos, treinamentos e iniciativas.", pontos: 700, prefixo: "até", medicao: "Frequência nas atividades (RH)", icone: "calendar" },
-      { nome: "Indicação de negócio (ADV)", desc: "Indicação de novos negócios e oportunidades.", pontos: 500, prefixo: "", medicao: "Informação dos sócios", icone: "briefcase" },
       { nome: "Acompanhamento de competências", desc: "Evolução técnica, desempenho e desenvolvimento.", pontos: 3500, prefixo: "até", medicao: "Avaliação dos líderes", icone: "trending" },
+      { nome: "Bônus: indicação de negócio", desc: "Por indicação de novo negócio validada pelos sócios. Exclusivo dos advogados, fora do total.", pontos: 500, prefixo: "+", bonus: true, medicao: "Informação dos sócios", icone: "briefcase" },
     ],
   };
 

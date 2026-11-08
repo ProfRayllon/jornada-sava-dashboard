@@ -158,7 +158,7 @@
     $("#scoreGrid").innerHTML = blocos
       .map((b) => {
         const itens = R.pontuacaoBimestral[b.id];
-        const total = itens.reduce((t, i) => t + i.pontos, 0);
+        const total = itens.filter((i) => !i.bonus).reduce((t, i) => t + i.pontos, 0);
         return `
         <article class="score-card reveal">
           <header class="score-head ${b.classe}">${icon(b.icone)}<h3>${b.titulo}</h3></header>
@@ -168,11 +168,11 @@
             <div class="score-row" style="--d:${n}">
               ${icon(i.icone)}
               <div><h4>${i.nome}</h4><p>${i.desc}</p></div>
-              <div class="score-value"><small>${i.prefixo ? "até" : "&nbsp;"}</small><b>${fmt(i.pontos)}</b> <small>Savacoins</small></div>
+              <div class="score-value"><small>${i.bonus ? "bônus +" : i.prefixo ? "até" : "&nbsp;"}</small><b>${fmt(i.pontos)}</b> <small>Savacoins</small></div>
             </div>`,
             )
             .join("")}
-          <footer class="score-total" style="--d:${itens.length}"><span>${icon("coins")}Total possível no bimestre</span><b>${fmt(total)}<small>Savacoins</small></b></footer>
+          <footer class="score-total" style="--d:${itens.length}"><span>${icon("coins")}Total possível no ano</span><b>${fmt(total)}<small>Savacoins</small></b></footer>
         </article>`;
       })
       .join("");
