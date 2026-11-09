@@ -232,6 +232,8 @@
     const lancs = S.listarLancamentos().filter((l) => l.ano === ano);
     const avaliacoes = lancs.filter((l) => l.tipo === "avaliacao");
     const avaliados = new Set(avaliacoes.map((l) => l.pessoaId));
+    // Avaliações que vieram das planilhas (ex.: 2025 e 1º semestre de 2026) também contam.
+    linhas.forEach((l) => l.base.tecnica + l.base.socio + l.base.competencias > 0 && avaliados.add(l.pessoa.id));
     const avaliaveis = linhas.filter((l) => l.pessoa.categoria);
     const pendentes = avaliaveis.filter((l) => !avaliados.has(l.pessoa.id));
     const totalCoins = linhas.reduce((t, l) => t + l.score, 0);

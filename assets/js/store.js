@@ -252,9 +252,41 @@
     const lancamentos = dados.lancamentos.filter((l) => l.ano === Number(ano));
     const pilares = ["felicidade", "eventos", "tecnica", "socio", "competencias", "extras"];
 
-    const pessoas = dados.pessoas.length
-      ? dados.pessoas
-      : (base?.people || []).map((p) => ({ id: p.key, nome: p.name, chaveBase: p.key, categoria: categoriaPorRotulo[p.category] || null, ativo: true }));
+    const daPlanilha = (p) => {
+      const chave = p.key || normalizar(p.name);
+      return { id: `base:${chave}`, nome: p.name, chaveBase: chave, categoria: categoriaPorRotulo[p.category] || null, ativo: true, daPlanilha: true };
+    };
+
+    let pessoas;
+    if (!dados.pessoas.length) {
+      pessoas = (base?.people || []).map(daPlanilha);
+    } else if (base && ano !== R.anoAtual) {
+      // Ano fechado vindo de planilha (ex.: 2025): a planilha é a referência, porque o cadastro do
+      // sistema foi importado da planilha de 2026 e os nomes mudam de um ano para o outro
+      // ("DAVI DE ASSIS PINHEIRO DA SILVA" em 2025, "DAVI DE ASSIS" em 2026). Cada linha é ligada
+      // ao colaborador cadastrado quando o nome bate; quem não está mais no cadastro aparece igual.
+      const usados = new Set();
+      const acharCadastro = (bp) => {
+        const n = normalizar(bp.name);
+        return dados.pessoas.find((p) => {
+          if (usados.has(p.id)) return false;
+          const m = normalizar(p.nome);
+          return p.chaveBase === bp.key || m === n || n.startsWith(`${m} `) || m.startsWith(`${n} `);
+        });
+      };
+      pessoas = base.people.map((bp) => {
+        const cadastro = acharCadastro(bp);
+        if (!cadastro) return daPlanilha(bp);
+        usados.add(cadastro.id);
+        return { ...cadastro, chaveBase: bp.key || normalizar(bp.name), ativo: true };
+      });
+      // Colaboradores com lançamentos nesse ano que não constam na planilha.
+      dados.pessoas
+        .filter((p) => p.ativo && !usados.has(p.id) && lancamentos.some((l) => l.pessoaId === p.id || l.pessoaIds?.includes(p.id)))
+        .forEach((p) => pessoas.push(p));
+    } else {
+      pessoas = dados.pessoas;
+    }
 
     return pessoas
       .filter((p) => p.ativo)
