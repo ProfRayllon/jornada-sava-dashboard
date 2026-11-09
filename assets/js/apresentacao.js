@@ -13,7 +13,7 @@
   // Ícones dos números (traço fino, herdam a cor do texto).
   const ICONES = {
     pessoas: '<path d="M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10" cy="8" r="3.5"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/>',
-    moedas: '<ellipse cx="9" cy="7" rx="5.5" ry="2.5"/><path d="M3.5 7v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5V7"/><path d="M9.5 16.4c.9.1 1.6.1 2.5.1 3 0 5.5-1.1 5.5-2.5v-4"/><path d="M14.5 10.6c2.2.3 3 1.1 3 1.9"/><path d="M3.5 11v4c0 1.4 2.5 2.5 5.5 2.5"/>',
+    moedas: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="6.4" opacity=".55"/><path d="M14.2 9.9c-.4-.8-1.2-1.2-2.2-1.2-1.3 0-2.2.7-2.2 1.7 0 2.4 4.6 1.3 4.6 3.6 0 1-1 1.8-2.4 1.8-1 0-1.9-.5-2.3-1.3M12 7.4v1.3M12 15.3v1.3"/>',
     media: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     avaliacao: '<rect x="5" y="4.5" width="14" height="16.5" rx="2.5"/><path d="M9 4.5V3h6v1.5"/><path d="M9 13l2 2 4-4"/>',
     agenda: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h3M8 17h6"/>',
@@ -268,7 +268,7 @@
         </div>
         <ul class="selo-pessoas ${n > 18 ? "compacta" : ""}">
           ${s.pessoas
-            .map((l, i) => `<li style="--i:${Math.min(i, 30)}">${avatar(l.pessoa)}<span><b>${esc(nomeBonito(l.pessoa.nome))}</b><small>${R.categorias[l.pessoa.categoria] || ""}</small></span></li>`)
+            .map((l, i) => `<li style="--i:${Math.min(i, 30)}"><span class="ap-av">${esc(iniciais(l.pessoa.nome))}</span><span><b>${esc(nomeBonito(l.pessoa.nome))}</b><small>${R.categorias[l.pessoa.categoria] || ""}</small></span></li>`)
             .join("")}
         </ul>
       </div>`;
@@ -324,23 +324,24 @@
         .join("");
       return `<div class="c-vencedor ${v.length > 1 ? "empate" : ""}">
         <div class="particulas" id="apreParticulas" aria-hidden="true"></div>
-        <div class="v-cabeca">
-          <p class="apre-kicker">${v.length > 1 ? "Grandes destaques do ano" : "Grande destaque do ano"}</p>
-          <h2>Jornada SAVA ${d.ano}</h2>
-        </div>
         <div class="v-retrato">
-          <div class="v-luz" aria-hidden="true"><span class="v-aro"></span><span class="v-aro v-aro2"></span><img class="v-simbolo" src="assets/logo/sava-simbolo.png" alt="" /></div>
+          <div class="v-luz" aria-hidden="true"><img class="v-simbolo" src="assets/logo/sava-simbolo.png" alt="" /></div>
           <div class="v-pessoas">${retratos}</div>
         </div>
         <div class="v-info">
-          <h1 class="v-nome">${v.map((l) => esc(nomeBonito(l.pessoa.nome))).join(" &amp; ")}</h1>
+          <p class="apre-kicker">${v.length > 1 ? "Grandes destaques" : "Grande destaque"} · Jornada SAVA ${d.ano}</p>
+          <h1 class="v-nome">${v.map((l) => esc(nomeBonito(l.pessoa.nome))).join("<br>")}</h1>
           <p class="v-area">${[...new Set(v.map((l) => R.categorias[l.pessoa.categoria] || ""))].join(" · ")}</p>
+          <div class="v-pontos"><strong data-count="${p.score}" data-atraso="2300">0</strong><span>Savacoins em ${d.ano}</span></div>
           <div class="v-dados">
-            <span><strong data-count="${p.score}">0</strong><small>Savacoins em ${d.ano}</small></span>
-            <span><strong>${p.nivel.nome}</strong><small>nível</small></span>
-            <span><strong data-count="${p.levelScore}">0</strong><small>acumulados</small></span>
-            ${selosDoVencedor.map((s) => `<span class="v-selo" title="${s.nome}"><img src="${s.imagem}" alt="" /><b>${s.nome}</b></span>`).join("")}
+            <span><small>Nível</small><strong>${p.nivel.nome}</strong></span>
+            <span><small>Acumulados</small><strong data-count="${p.levelScore}" data-atraso="2600">0</strong></span>
           </div>
+          ${
+            selosDoVencedor.length
+              ? `<div class="v-selos"><small>Selos conquistados</small><div>${selosDoVencedor.map((s) => `<span class="v-selo"><img src="${s.imagem}" alt="" /><b>${s.nome}</b></span>`).join("")}</div></div>`
+              : ""
+          }
         </div>
       </div>`;
     }
@@ -356,7 +357,7 @@
     $$("[data-count]", raiz).forEach((el, i) => {
       const alvo = Number(el.dataset.count) || 0;
       if (reduzMovimento() || !alvo) return (el.textContent = fmt(alvo));
-      const atraso = 250 + i * 90;
+      const atraso = Number(el.dataset.atraso) || 250 + i * 90;
       const duracao = 1300;
       setTimeout(() => {
         const inicio = performance.now();
