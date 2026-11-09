@@ -637,14 +637,16 @@
     );
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
-        if (!confirm("Excluir este evento?")) return;
-        try {
-          await S.excluirAtividade(b.dataset.excluir);
-        } catch (err) {
-          return toast(err.message);
-        }
-        toast("Evento excluído.");
-        renderEventos(el);
+        const a = S.listarAtividades().find((x) => x.id === b.dataset.excluir);
+        const sim = await confirmar({
+          titulo: "Excluir evento?",
+          mensagem: `<b>${esc(a?.titulo || "")}</b> · ${a ? dataBr(a.data) : ""}<br>Esta ação não pode ser desfeita.`,
+          acao: "Excluir",
+          perigo: true,
+        });
+        if (!sim) return;
+        const r = await executar(() => S.excluirAtividade(b.dataset.excluir), { carregando: "Excluindo evento…", concluido: "Evento excluído" });
+        if (r.ok) renderEventos(el);
       }),
     );
   }
@@ -688,15 +690,15 @@
       if (!titulo) return ($("#atvErro").textContent = "Informe o nome do evento.");
       if (!data) return ($("#atvErro").textContent = "Informe a data.");
       if (tipo !== "avaliacao" && (!pontos || pontos < 1)) return ($("#atvErro").textContent = "Informe os Savacoins por pessoa.");
-      try {
-        const salvo = await S.salvarAtividade({ id: a.id, tipo, titulo, data, pontos, descricao: campo("descricao").value });
-        state.atividadeSel[salvo.tipo] = salvo.id;
-        state.ano = salvo.ano;
-      } catch (err) {
-        return ($("#atvErro").textContent = err.message);
-      }
+      const r = await executar(() => S.salvarAtividade({ id: a.id, tipo, titulo, data, pontos, descricao: campo("descricao").value }), {
+        carregando: a.id ? "Salvando evento…" : "Cadastrando evento…",
+        concluido: a.id ? "Evento atualizado" : "Evento cadastrado",
+        detalhe: (salvo) => `<b>${esc(salvo.titulo)}</b><br>${dataBr(salvo.data)} · Jornada ${salvo.ano}`,
+      });
+      if (!r.ok) return ($("#atvErro").textContent = r.erro.message);
+      state.atividadeSel[r.resultado.tipo] = r.resultado.id;
+      state.ano = r.resultado.ano;
       fecharModal();
-      toast(a.id ? "Evento atualizado." : "Evento cadastrado.");
       render();
     });
   }
@@ -988,16 +990,18 @@
       }
     }
 
-    if (avisos.length && !confirm(`${avisos.join("\n")}\n\nDeseja registrar mesmo assim?`)) return;
+    if (avisos.length && !(await confirmar({ titulo: "Atenção ao teto anual", mensagem: avisos.map(esc).join("<br>"), acao: "Registrar mesmo assim" }))) return;
 
-    try {
-      await S.registrarLancamento(dados);
-    } catch (err) {
-      return (erro.textContent = err.message);
-    }
+    const nomePessoa = dados.pessoaId ? nomeBonito(S.listarPessoas().find((p) => p.id === dados.pessoaId)?.nome || "") : "";
+    const evento = dados.atividadeId ? S.listarAtividades().find((a) => a.id === dados.atividadeId) : null;
+    const r = await executar(() => S.registrarLancamento(dados), {
+      carregando: "Registrando lançamento…",
+      concluido: "Lançamento concluído",
+      detalhe: `${tipos[tipo].nome}${evento ? ` · ${esc(evento.titulo)}` : ""}<br><b>${qtd > 1 ? `${qtd} pessoas pontuadas` : esc(nomePessoa) || "Registrado"}</b> na Jornada ${ano}`,
+    });
+    if (!r.ok) return (erro.textContent = r.erro.message);
     state.pessoaPreSelecionada = null;
     state.ano = ano;
-    toast(`${tipos[tipo].nome}: ${qtd > 1 ? `${qtd} pessoas pontuadas` : "registrado"} na Jornada ${ano}.`);
     renderLancar($("#content"));
   }
 
@@ -1064,14 +1068,17 @@
     });
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
-        if (!confirm("Excluir este lançamento? A pontuação será removida do painel.")) return;
-        try {
-          await S.excluirLancamento(b.dataset.excluir);
-        } catch (err) {
-          return toast(err.message);
-        }
-        toast("Lançamento excluído.");
-        renderHistorico(el);
+        const l = S.listarLancamentos().find((x) => x.id === b.dataset.excluir);
+        const sim = await confirmar({
+          titulo: "Excluir lançamento?",
+          mensagem: `<b>${l ? tipos[l.tipo].nome : ""}${l?.titulo ? ` · ${esc(l.titulo)}` : ""}</b><br>${l ? `${esc(resumoPessoas(l))} · ${dataBr(l.data)}` : ""}`,
+          detalhe: "A pontuação será removida do ranking e do painel. Esta ação não pode ser desfeita.",
+          acao: "Excluir",
+          perigo: true,
+        });
+        if (!sim) return;
+        const r = await executar(() => S.excluirLancamento(b.dataset.excluir), { carregando: "Excluindo lançamento…", concluido: "Lançamento excluído", detalhe: "Ranking e painel atualizados." });
+        if (r.ok) renderHistorico(el);
       }),
     );
   }
@@ -1116,17 +1123,18 @@
     if (!p) return;
     const lancs = S.listarLancamentos().filter((l) => l.pessoaId === id || l.pessoaIds?.includes(id));
     const nome = nomeBonito(p.nome);
-    const aviso = lancs.length
-      ? `${nome} tem ${lancs.length} lançamento(s) com pontos no sistema. Ao excluir, esses pontos também serão apagados.\n\nSe a ideia é só tirar a pessoa da Jornada mantendo o histórico, use Editar e desmarque "ativo".\n\nExcluir mesmo assim? Esta ação não pode ser desfeita.`
-      : `Excluir ${nome} da Jornada? Esta ação não pode ser desfeita.`;
-    if (!confirm(aviso)) return;
-    try {
-      await S.excluirPessoa(id);
-    } catch (err) {
-      return toast(err.message);
-    }
-    toast(`${nome} foi excluído(a).`);
-    render();
+    const sim = await confirmar({
+      titulo: "Excluir colaborador?",
+      mensagem: `<b>${esc(nome)}</b> será removido(a) da Jornada. Esta ação não pode ser desfeita.`,
+      detalhe: lancs.length
+        ? `Esta pessoa tem <b>${lancs.length} lançamento(s)</b> com pontos, que também serão apagados. Para só tirar da Jornada mantendo o histórico, use <b>Editar</b> e desmarque “ativo”.`
+        : "",
+      acao: "Excluir",
+      perigo: true,
+    });
+    if (!sim) return;
+    const r = await executar(() => S.excluirPessoa(id), { carregando: "Excluindo colaborador…", concluido: "Colaborador excluído", detalhe: esc(nome) });
+    if (r.ok) render();
   }
 
   function formPessoa(p = {}) {
@@ -1148,14 +1156,13 @@
       e.preventDefault();
       const fd = new FormData(e.target);
       if (!fd.get("nome").trim() || !fd.get("categoria")) return ($("#pfErro").textContent = "Preencha nome e perfil.");
-      try {
-        await S.salvarPessoa({ id: p.id, nome: fd.get("nome"), categoria: fd.get("categoria"), setor: fd.get("setor"), ativo: p.id ? fd.get("ativo") === "on" : true });
-        fecharModal();
-        toast("Colaborador salvo.");
-        render();
-      } catch (err) {
-        $("#pfErro").textContent = err.message;
-      }
+      const r = await executar(
+        () => S.salvarPessoa({ id: p.id, nome: fd.get("nome"), categoria: fd.get("categoria"), setor: fd.get("setor"), ativo: p.id ? fd.get("ativo") === "on" : true }),
+        { carregando: "Salvando colaborador…", concluido: p.id ? "Colaborador atualizado" : "Colaborador cadastrado", detalhe: esc(fd.get("nome")) },
+      );
+      if (!r.ok) return ($("#pfErro").textContent = r.erro.message);
+      fecharModal();
+      render();
     });
   }
 
@@ -1218,23 +1225,23 @@
       const senha = fd.get("senha");
       if (!fd.get("nome").trim() || !fd.get("email").trim()) return ($("#ufErro").textContent = "Preencha nome e e-mail.");
       if (senha && senha.length < 6) return ($("#ufErro").textContent = "A senha precisa de pelo menos 6 caracteres.");
-      try {
-        await S.salvarUsuario({
-          id: u.id,
-          nome: fd.get("nome"),
-          email: fd.get("email"),
-          perfil: fd.get("perfil"),
-          area: fd.get("area"),
-          senha,
-          trocarSenha: fd.get("trocarSenha") === "on",
-          ativo: u.id ? fd.get("ativo") === "on" : true,
-        });
-        fecharModal();
-        toast("Acesso salvo.");
-        render();
-      } catch (err) {
-        $("#ufErro").textContent = err.message;
-      }
+      const r = await executar(
+        () =>
+          S.salvarUsuario({
+            id: u.id,
+            nome: fd.get("nome"),
+            email: fd.get("email"),
+            perfil: fd.get("perfil"),
+            area: fd.get("area"),
+            senha,
+            trocarSenha: fd.get("trocarSenha") === "on",
+            ativo: u.id ? fd.get("ativo") === "on" : true,
+          }),
+        { carregando: "Salvando acesso…", concluido: u.id ? "Acesso atualizado" : "Acesso criado", detalhe: esc(fd.get("email")) },
+      );
+      if (!r.ok) return ($("#ufErro").textContent = r.erro.message);
+      fecharModal();
+      render();
     });
   }
 
@@ -1285,6 +1292,102 @@
     modal.classList.remove("open");
     modal.setAttribute("aria-hidden", "true");
     delete modal.dataset.locked;
+  }
+
+  // ---------------- Janela de status (centro da tela) ----------------
+  // confirmar(): pergunta antes de uma ação (ex.: excluir). executar(): mostra "carregando" enquanto
+  // grava no banco e depois "concluído" (ou o erro), para o resultado ficar bem visível.
+  const ICONE_OK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const ICONE_LIXO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+  const ICONE_ALERTA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8v5M12 16.5v.5"/><path d="M10.3 3.9L2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+  let statusTimer;
+
+  function janelaStatus() {
+    let el = $("#statusOverlay");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "statusOverlay";
+      el.className = "status-overlay";
+      el.setAttribute("role", "dialog");
+      el.setAttribute("aria-modal", "true");
+      el.setAttribute("aria-live", "assertive");
+      document.body.appendChild(el);
+    }
+    clearTimeout(statusTimer);
+    return el;
+  }
+
+  function fecharStatus() {
+    clearTimeout(statusTimer);
+    $("#statusOverlay")?.classList.remove("open");
+  }
+
+  function confirmar({ titulo, mensagem, detalhe = "", acao = "Confirmar", perigo = false }) {
+    return new Promise((resolve) => {
+      const el = janelaStatus();
+      el.innerHTML = `<div class="status-card">
+        <span class="status-icon ${perigo ? "is-danger" : "is-warn"}">${perigo ? ICONE_LIXO : ICONE_ALERTA}</span>
+        <h3>${titulo}</h3>
+        <p>${mensagem}</p>
+        ${detalhe ? `<p class="status-detail">${detalhe}</p>` : ""}
+        <div class="status-actions">
+          <button type="button" class="btn btn-ghost" data-resposta="nao">Cancelar</button>
+          <button type="button" class="btn ${perigo ? "btn-danger" : "btn-gold"}" data-resposta="sim">${acao}</button>
+        </div>
+      </div>`;
+      el.classList.add("open");
+      const fim = (sim) => {
+        document.removeEventListener("keydown", tecla, true);
+        fecharStatus();
+        resolve(sim);
+      };
+      const tecla = (e) => {
+        if (e.key !== "Escape") return;
+        e.stopPropagation();
+        fim(false);
+      };
+      document.addEventListener("keydown", tecla, true);
+      $$("[data-resposta]", el).forEach((b) => b.addEventListener("click", () => fim(b.dataset.resposta === "sim")));
+      // Numa exclusão, o foco começa em "Cancelar" para um Enter distraído não apagar nada.
+      $(`[data-resposta="${perigo ? "nao" : "sim"}"]`, el).focus();
+    });
+  }
+
+  async function executar(acao, { carregando, concluido, detalhe = "" }) {
+    const el = janelaStatus();
+    el.innerHTML = `<div class="status-card">
+      <span class="status-spinner" aria-hidden="true"></span>
+      <h3>${carregando}</h3>
+      <p>Aguarde, gravando no banco de dados…</p>
+    </div>`;
+    el.classList.add("open");
+    const inicio = Date.now();
+    try {
+      const resultado = await acao();
+      // Deixa o "carregando" visível por um instante, mesmo quando o servidor responde muito rápido.
+      await new Promise((r) => setTimeout(r, Math.max(0, 700 - (Date.now() - inicio))));
+      const texto = typeof detalhe === "function" ? detalhe(resultado) : detalhe;
+      el.innerHTML = `<div class="status-card">
+        <span class="status-icon is-ok">${ICONE_OK}</span>
+        <h3>${concluido}</h3>
+        ${texto ? `<p>${texto}</p>` : ""}
+        <div class="status-actions"><button type="button" class="btn btn-gold" data-fechar>OK</button></div>
+      </div>`;
+      $("[data-fechar]", el).addEventListener("click", fecharStatus);
+      $("[data-fechar]", el).focus();
+      statusTimer = setTimeout(fecharStatus, 2600);
+      return { ok: true, resultado };
+    } catch (err) {
+      el.innerHTML = `<div class="status-card">
+        <span class="status-icon is-danger">${ICONE_ALERTA}</span>
+        <h3>Não foi possível concluir</h3>
+        <p>${esc(err.message)}</p>
+        <div class="status-actions"><button type="button" class="btn btn-ghost" data-fechar>Fechar</button></div>
+      </div>`;
+      $("[data-fechar]", el).addEventListener("click", fecharStatus);
+      $("[data-fechar]", el).focus();
+      return { ok: false, erro: err };
+    }
   }
 
   let toastTimer;
