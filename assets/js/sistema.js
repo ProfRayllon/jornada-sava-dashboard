@@ -264,7 +264,7 @@
 
       <section class="card" id="rankingCard">
         <div class="card-head">
-          <div><h2>Ranking ao vivo · ${ano}</h2><p class="muted">${S.temBase(ano) ? "Base das planilhas + lançamentos do sistema" : "Lançamentos feitos no sistema"}. Clique numa pessoa para ver o progresso.</p></div>
+          <div><h2>Ranking ao vivo · ${ano}</h2><p class="muted">${S.temBase(ano) ? "Base das planilhas + lançamentos do sistema" : "Lançamentos feitos no sistema"}. Clique numa pessoa para ver o progresso.</p>${statusPublicacao(ano)}</div>
           <div class="filters">
             ${seletorAno("fAno")}
             <input type="search" id="fBusca" placeholder="Buscar pessoa" value="${esc(f.busca)}" />
@@ -357,6 +357,7 @@
       renderVisao(el);
     });
     ligarSeletorAno(el, "fAno", renderVisao);
+    $("#pubAno", el)?.addEventListener("click", () => alternarPublicacao(ano));
     $$("[data-nivel]", el).forEach((b) =>
       b.addEventListener("click", () => {
         f.nivel = f.nivel === b.dataset.nivel ? "all" : b.dataset.nivel;
@@ -374,6 +375,44 @@
       const tr = e.target.closest("[data-pessoa]");
       if (tr && e.key === "Enter") abrirPessoa(tr.dataset.pessoa);
     });
+  }
+
+  // Publicação no site: o ranking, os números e o vencedor de um ano só aparecem na página
+  // inicial depois que o administrador publica aquele ano.
+  function statusPublicacao(ano) {
+    const publicado = S.anosPublicados().includes(ano);
+    const admin = state.usuario.perfil === "admin";
+    return `<div class="pub-status ${publicado ? "on" : ""}">
+      <span class="pub-dot" aria-hidden="true"></span>
+      <span>${publicado ? `Jornada ${ano} <b>publicada</b> no site` : `Jornada ${ano} <b>oculta</b> no site`}</span>
+      ${admin ? `<button type="button" class="btn btn-sm ${publicado ? "btn-ghost" : "btn-gold"}" id="pubAno">${publicado ? "Despublicar" : "Publicar no site"}</button>` : ""}
+    </div>`;
+  }
+
+  async function alternarPublicacao(ano) {
+    const publicar = !S.anosPublicados().includes(ano);
+    const sim = await confirmar(
+      publicar
+        ? {
+            titulo: `Publicar a Jornada ${ano}?`,
+            mensagem: `O ranking, os números e o <b>destaque do ano</b> de ${ano} vão aparecer na página inicial do site.`,
+            detalhe: "Os pontos continuam sendo atualizados no site a cada novo lançamento. Você pode despublicar quando quiser.",
+            acao: "Publicar",
+          }
+        : {
+            titulo: `Despublicar a Jornada ${ano}?`,
+            mensagem: `A Jornada ${ano} deixa de aparecer na página inicial do site.`,
+            detalhe: "Nada é apagado: os dados continuam no sistema e no painel interno.",
+            acao: "Despublicar",
+          },
+    );
+    if (!sim) return;
+    const r = await executar(() => S.publicarAno(ano, publicar), {
+      carregando: publicar ? "Publicando no site…" : "Despublicando…",
+      concluido: publicar ? `Jornada ${ano} publicada` : `Jornada ${ano} oculta no site`,
+      detalhe: publicar ? "Já aparece na página inicial." : "Não aparece mais na página inicial.",
+    });
+    if (r.ok) render();
   }
 
   function kpi(rotulo, valor, sub, progresso) {

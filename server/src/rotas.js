@@ -58,12 +58,25 @@ async function lerTudo() {
   return { pessoas: pessoas.rows.map(pessoaDoBanco), lancamentos: lancamentos.rows.map(lancamentoDoBanco), atualizadoEm };
 }
 
-// Homepage pública: só o necessário para somar o ranking, sem notas, feedbacks nem autores.
+async function lerAnosPublicados(c = pool) {
+  const { rows } = await c.query("SELECT valor FROM meta WHERE chave = 'anos_publicados'");
+  try {
+    const anos = JSON.parse(rows[0]?.valor || "[]");
+    return Array.isArray(anos) ? anos.map(Number).filter(Boolean).sort((a, b) => a - b) : [];
+  } catch {
+    return [];
+  }
+}
+
+// Homepage pública: só o necessário para somar o ranking, sem notas, feedbacks nem autores,
+// e só dos anos que o administrador publicou no site.
 rotas.get("/publico", assincrono(async (req, res) => {
   const { pessoas, lancamentos, atualizadoEm } = await lerTudo();
+  const anosPublicados = await lerAnosPublicados();
   res.json({
+    anosPublicados,
     pessoas: pessoas.map(({ id, nome, chaveBase, categoria, ativo }) => ({ id, nome, chaveBase, categoria, ativo })),
-    lancamentos: lancamentos.map((l) => {
+    lancamentos: lancamentos.filter((l) => anosPublicados.includes(l.ano)).map((l) => {
       const { selos, ...pontos } = R.pontosDoLancamento({ ...l, pessoaId: undefined, pessoaIds: undefined }, null);
       return { id: l.id, ano: l.ano, bimestre: l.bimestre, pessoaId: l.pessoaId, pessoaIds: l.pessoaIds, tipo: "resumo", resumo: { ...pontos, selos } };
     }),
@@ -75,12 +88,33 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
   const tudo = await lerTudo();
   const { rows: atividades } = await pool.query("SELECT * FROM atividades ORDER BY data DESC, criado_em DESC");
   tudo.atividades = atividades.map(atividadeDoBanco);
+  tudo.anosPublicados = await lerAnosPublicados();
   let usuarios = [];
   if (req.usuario.perfil === "admin") {
     const { rows } = await pool.query("SELECT * FROM usuarios ORDER BY nome");
     usuarios = rows.map(usuarioPublico);
   }
   res.json({ eu: req.usuario, usuarios, ...tudo });
+}));
+
+// Publica ou oculta um ano na homepage (só administrador).
+rotas.put("/anos-publicados/:ano", auth.exigir("admin"), assincrono(async (req, res) => {
+  const ano = Number(req.params.ano);
+  if (!Number.isInteger(ano) || ano < 2025 || ano > new Date().getFullYear() + 1) throw new ErroDeUso("Ano inválido.");
+  const anosPublicados = await transacao(async (c) => {
+    const atuais = new Set(await lerAnosPublicados(c));
+    if (req.body?.publicado) atuais.add(ano);
+    else atuais.delete(ano);
+    const lista = [...atuais].sort((a, b) => a - b);
+    await c.query(
+      "INSERT INTO meta (chave, valor) VALUES ('anos_publicados', $1) ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor",
+      [JSON.stringify(lista)],
+    );
+    await tocar(c);
+    return lista;
+  });
+  avisarTodos();
+  res.json({ anosPublicados });
 }));
 
 // ---------- Sessão ----------

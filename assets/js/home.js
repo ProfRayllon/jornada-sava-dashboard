@@ -77,9 +77,20 @@
   }
 
   // ---------- Números ----------
-  // Ano da Jornada em andamento: o mais recente com dados no sistema (ex.: 2027 após o 1º lançamento).
+  // Anos que aparecem no site: só os que o administrador publicou na Visão geral do sistema.
+  // Sem resposta do servidor, usa os anos da base das planilhas.
+  function anosNoSite() {
+    const db = S?.lerDb();
+    const pub = db?.anosPublicados;
+    const anos = new Set(Object.keys(window.JORNADA_SAVA_PANEL_DATA?.years || {}).map(Number));
+    if (db) S.anosDisponiveis().forEach((a) => anos.add(a));
+    (pub || []).forEach((a) => anos.add(a));
+    return [...anos].filter((a) => !pub || pub.includes(a)).sort((a, b) => b - a);
+  }
+
+  // Ano em destaque no site: o mais recente publicado.
   function anoVigente() {
-    return S?.lerDb() ? S.anoVigente() : R.anoAtual;
+    return anosNoSite()[0] || R.anoAtual;
   }
 
   function rankingDoAno(ano) {
@@ -312,8 +323,7 @@
   }
 
   function montarHall() {
-    const anos = [...new Set([...Object.keys(window.JORNADA_SAVA_PANEL_DATA?.years || {}).map(Number), ...(S?.lerDb() ? S.anosDisponiveis() : [])])]
-      .sort((a, b) => b - a);
+    const anos = anosNoSite();
     const campeoes = anos.map((ano) => ({ ano, p: rankingDoAno(ano)[0] })).filter((c) => c.p);
     if (!campeoes.length) {
       $("#vencedores").hidden = true;

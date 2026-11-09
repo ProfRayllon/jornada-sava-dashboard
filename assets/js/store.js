@@ -64,7 +64,7 @@
       estado = await api("publico");
     }
     eu = estado.eu || null;
-    db = { usuarios: estado.usuarios || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], atualizadoEm: estado.atualizadoEm };
+    db = { usuarios: estado.usuarios || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], anosPublicados: estado.anosPublicados || null, atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
@@ -199,6 +199,16 @@
 
   async function excluirLancamento(id) {
     await api(`lancamentos/${encodeURIComponent(id)}`, { metodo: "DELETE" });
+    await aposEscrita();
+  }
+
+  // ---------- Anos publicados na homepage ----------
+  function anosPublicados() {
+    return db?.anosPublicados || [];
+  }
+
+  async function publicarAno(ano, publicado) {
+    await api(`anos-publicados/${Number(ano)}`, { metodo: "PUT", corpo: { publicado } });
     await aposEscrita();
   }
 
@@ -355,6 +365,8 @@
     listarLancamentos,
     registrarLancamento,
     excluirLancamento,
+    anosPublicados,
+    publicarAno,
     listarAtividades,
     salvarAtividade,
     excluirAtividade,
