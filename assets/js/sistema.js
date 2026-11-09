@@ -13,6 +13,7 @@
     visao: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
     painel: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v1.5A3.5 3.5 0 0 1 16.5 10M7 5H4v1.5A3.5 3.5 0 0 0 7.5 10"/>',
     lancar: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    apresentacao: '<rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M12 16.5V20M8.5 20h7"/><path d="M10 8.2v4.6l4-2.3z"/>',
     eventos: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/>',
     historico: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5M12 7.5V12l3 2"/>',
     pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-3.5-5.8"/>',
@@ -66,6 +67,7 @@
   const views = {
     visao: { nome: "Visão geral", kicker: "Acompanhamento da Jornada", render: renderVisao },
     painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel },
+    apresentacao: { nome: "Apresentação", kicker: "Resultado do ano", render: (el) => window.SAVA_APRESENTACAO.render(el, { ano: state.ano }) },
     eventos: { nome: "Eventos", kicker: "Encontros, eventos, missões e ciclos", render: renderEventos, perfis: ["admin", "rh"] },
     lancar: { nome: "Novo lançamento", kicker: "Registrar pontuação", render: renderLancar },
     historico: { nome: "Lançamentos", kicker: "Histórico do ano", render: renderHistorico },
@@ -92,7 +94,7 @@
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
       if (!S.anosDisponiveis().includes(state.ano)) state.ano = S.anoVigente();
-      if (!$("#modal").classList.contains("open") && !["lancar", "painel"].includes(state.view)) render();
+      if (!$("#modal").classList.contains("open") && !["lancar", "painel", "apresentacao"].includes(state.view)) render();
     });
   });
 
@@ -184,7 +186,7 @@
     $("#viewTitle").textContent = v.nome;
     $("#viewKicker").textContent = v.kicker;
     $$("#sideNav [data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
-    $("#content").classList.toggle("content-full", state.view === "painel");
+    $("#content").classList.toggle("content-full", ["painel", "apresentacao"].includes(state.view));
     v.render($("#content"));
   }
 
