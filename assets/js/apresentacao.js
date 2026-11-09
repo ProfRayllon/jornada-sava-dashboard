@@ -117,7 +117,6 @@
             <select id="apreAno">${anos.map((a) => `<option value="${a}" ${a === st.ano ? "selected" : ""}>Jornada ${a}</option>`).join("")}</select>
           </label>
           <p class="apre-resumo">${d.pontuados ? `${fmt(d.pessoas)} colaboradores · ${fmt(d.total)} Savacoins · ${fmt(d.totalSelos)} selos` : "Este ano ainda não tem pontuação."}</p>
-          ${listaFotos(d)}
           <div class="apre-acoes">
             <button type="button" class="apre-btn apre-btn-ouro" id="apreIniciar">Iniciar apresentação</button>
             <button type="button" class="apre-btn" id="apreIniciarCheia">Iniciar em tela cheia</button>
@@ -129,64 +128,11 @@
       st.ano = Number(e.target.value);
       renderInicio();
     });
-    $$("[data-foto-de]", raiz).forEach((input) => input.addEventListener("change", () => enviarFotoDestaque(input, d)));
     $("#apreIniciar", raiz).addEventListener("click", () => irCena(0));
     $("#apreIniciarCheia", raiz).addEventListener("click", () => {
       irCena(0);
       telaCheia(true);
     });
-  }
-
-  // ---------- Fotos dos destaques (tela inicial) ----------
-  // Vencedor e top 5 sem foto aparecem com as iniciais; daqui dá para enviar a foto de cada um.
-  // Quem só existe numa planilha antiga (ex.: vencedor de 2025 que não está no cadastro atual) ganha
-  // um cadastro inativo, só para guardar a foto: não entra nos rankings dos anos atuais.
-  function podeEditarFotos() {
-    return ["admin", "rh"].includes(S.usuarioAtual()?.perfil);
-  }
-
-  function listaFotos(d) {
-    const destaques = [...d.vencedores, ...d.destaques];
-    if (!destaques.length) return "";
-    const faltam = destaques.filter((l) => l.pessoa.daPlanilha || !S.fotoUrl(l.pessoa));
-    if (!faltam.length) return `<p class="apre-fotos-ok">✓ Vencedor e destaques com foto</p>`;
-    return `<div class="apre-fotos">
-      <p><b>${faltam.length} destaque(s) sem foto</b> · aparecem com as iniciais</p>
-      <ul>${faltam
-        .map(
-          (l) => `<li>
-          <span class="ap-av">${esc(iniciais(l.pessoa.nome))}</span>
-          <span class="apre-fotos-nome"><b>${d.linhas.indexOf(l) + 1}º · ${esc(nomeBonito(l.pessoa.nome))}</b><small>${l.pessoa.daPlanilha ? "Fora do cadastro atual" : R.categorias[l.pessoa.categoria] || ""}</small></span>
-          ${podeEditarFotos() ? `<label class="apre-btn apre-btn-mini">Adicionar foto<input type="file" accept="image/png,image/webp,image/jpeg" hidden data-foto-de="${esc(l.pessoa.id)}" /></label>` : ""}
-        </li>`,
-        )
-        .join("")}</ul>
-    </div>`;
-  }
-
-  async function enviarFotoDestaque(input, d) {
-    const arquivo = input.files?.[0];
-    const linha = d.linhas.find((l) => l.pessoa.id === input.dataset.fotoDe);
-    if (!arquivo || !linha) return;
-    const li = input.closest("li");
-    const rotulo = input.closest("label");
-    li.classList.add("enviando");
-    rotulo.firstChild.textContent = "Enviando…";
-    try {
-      const dados = await S.prepararFoto(arquivo);
-      let id = linha.pessoa.id;
-      if (linha.pessoa.daPlanilha) {
-        const nova = await S.salvarPessoa({ nome: linha.pessoa.nome, categoria: linha.pessoa.categoria || "adm", setor: "" });
-        await S.salvarPessoa({ id: nova.id, nome: nova.nome, categoria: nova.categoria, setor: "", ativo: false });
-        id = nova.id;
-      }
-      await S.salvarFoto(id, dados);
-      renderInicio();
-    } catch (err) {
-      li.classList.remove("enviando");
-      rotulo.firstChild.textContent = "Tentar de novo";
-      $(".apre-fotos-nome small", li).textContent = err.message;
-    }
   }
 
   function fundo(intenso = false) {
@@ -378,24 +324,23 @@
         .join("");
       return `<div class="c-vencedor ${v.length > 1 ? "empate" : ""}">
         <div class="particulas" id="apreParticulas" aria-hidden="true"></div>
+        <div class="v-cabeca">
+          <p class="apre-kicker">${v.length > 1 ? "Grandes destaques do ano" : "Grande destaque do ano"}</p>
+          <h2>Jornada SAVA ${d.ano}</h2>
+        </div>
         <div class="v-retrato">
           <div class="v-luz" aria-hidden="true"><span class="v-aro"></span><span class="v-aro v-aro2"></span><img class="v-simbolo" src="assets/logo/sava-simbolo.png" alt="" /></div>
           <div class="v-pessoas">${retratos}</div>
         </div>
         <div class="v-info">
-          <p class="apre-kicker">${v.length > 1 ? "Grandes destaques" : "Grande destaque"} · ${d.ano}</p>
-          <h1 class="v-nome">${v.map((l) => esc(nomeBonito(l.pessoa.nome))).join("<br>")}</h1>
+          <h1 class="v-nome">${v.map((l) => esc(nomeBonito(l.pessoa.nome))).join(" &amp; ")}</h1>
           <p class="v-area">${[...new Set(v.map((l) => R.categorias[l.pessoa.categoria] || ""))].join(" · ")}</p>
           <div class="v-dados">
             <span><strong data-count="${p.score}">0</strong><small>Savacoins em ${d.ano}</small></span>
             <span><strong>${p.nivel.nome}</strong><small>nível</small></span>
             <span><strong data-count="${p.levelScore}">0</strong><small>acumulados</small></span>
+            ${selosDoVencedor.map((s) => `<span class="v-selo" title="${s.nome}"><img src="${s.imagem}" alt="" /><b>${s.nome}</b></span>`).join("")}
           </div>
-          ${
-            selosDoVencedor.length
-              ? `<div class="v-selos"><small>Selos conquistados</small><div>${selosDoVencedor.map((s) => `<span class="v-selo"><img src="${s.imagem}" alt="" /><b>${s.nome}</b></span>`).join("")}</div></div>`
-              : ""
-          }
         </div>
       </div>`;
     }

@@ -164,6 +164,11 @@ img { max-width: 100%; }
 .foto-acoes { display: grid; justify-items: start; gap: 8px; }
 .foto-acoes label.btn { cursor: pointer; }
 /* Visão geral em camadas */
+.foto-venc { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; padding: 4px 12px 4px 4px; border: 1px dashed var(--gold); border-radius: 999px; background: rgba(212, 178, 111, 0.1); color: var(--gold-deep); font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: background 0.2s ease; }
+.foto-venc:hover { background: rgba(212, 178, 111, 0.2); }
+.foto-venc .ico { width: 16px; height: 16px; margin-left: 6px; }
+.foto-venc img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; object-position: 50% 12%; background: var(--soft-2); }
+.foto-venc.so-ver { border-style: solid; cursor: default; }
 .pub-status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; padding: 6px 6px 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
 .pub-status b { color: var(--text); }
 .pub-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); opacity: 0.6; }

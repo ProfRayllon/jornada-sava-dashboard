@@ -14,6 +14,7 @@
     painel: '<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4z"/><path d="M17 5h3v1.5A3.5 3.5 0 0 1 16.5 10M7 5H4v1.5A3.5 3.5 0 0 0 7.5 10"/>',
     lancar: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
     apresentacao: '<rect x="3" y="4" width="18" height="12.5" rx="2"/><path d="M12 16.5V20M8.5 20h7"/><path d="M10 8.2v4.6l4-2.3z"/>',
+    camera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/>',
     eventos: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/>',
     historico: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1L3.5 8.5"/><path d="M3.5 3.5v5h5M12 7.5V12l3 2"/>',
     pessoas: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M21.5 20a6.5 6.5 0 0 0-3.5-5.8"/>',
@@ -295,7 +296,7 @@
                   return `
                 <tr data-pessoa="${l.pessoa.id}" tabindex="0">
                   <td><span class="pos pos-${pos <= 3 ? pos : "n"}">${pos}</span></td>
-                  <td><strong>${esc(nomeBonito(l.pessoa.nome))}</strong><small>${tagArea(l.pessoa.categoria)}${R.categorias[l.pessoa.categoria] || "Sem área"}</small></td>
+                  <td><strong>${esc(nomeBonito(l.pessoa.nome))}</strong><small>${tagArea(l.pessoa.categoria)}${R.categorias[l.pessoa.categoria] || "Sem área"}</small>${l.score > 0 && l.score === linhas[0].score ? fotoVencedor(l) : ""}</td>
                   <td><span class="level level-${l.nivel.slug}">${l.nivel.nome}</span></td>
                   <td class="comp-cell">${barraComposicao(l, linhas[0]?.score || 1)}</td>
                   <td class="num"><strong>${fmt(l.score)}</strong>${l.score !== l.base.score ? `<small class="delta">+${fmt(l.score - l.base.score)} no sistema</small>` : ""}</td>
@@ -360,6 +361,11 @@
     });
     ligarSeletorAno(el, "fAno", renderVisao);
     $("#pubAno", el)?.addEventListener("click", () => alternarPublicacao(ano));
+    $$("[data-foto-vencedor]", el).forEach((input) => {
+      // O clique na foto não deve abrir a ficha da pessoa (a linha inteira é clicável).
+      input.closest(".foto-venc").addEventListener("click", (e) => e.stopPropagation());
+      input.addEventListener("change", () => enviarFotoVencedor(input, linhas, el));
+    });
     $$("[data-nivel]", el).forEach((b) =>
       b.addEventListener("click", () => {
         f.nivel = f.nivel === b.dataset.nivel ? "all" : b.dataset.nivel;
@@ -377,6 +383,40 @@
       const tr = e.target.closest("[data-pessoa]");
       if (tr && e.key === "Enter") abrirPessoa(tr.dataset.pessoa);
     });
+  }
+
+  // Foto do vencedor do ano (aparece no último slide da Apresentação). Fica salva no banco.
+  // Quem só existe numa planilha antiga (ex.: vencedor de 2025 fora do cadastro atual) ganha um
+  // cadastro inativo só para guardar a foto: não entra nos rankings dos anos atuais.
+  function fotoVencedor(l) {
+    const url = l.pessoa.daPlanilha ? null : S.fotoUrl(l.pessoa);
+    const pode = ["admin", "rh"].includes(state.usuario.perfil);
+    if (!pode) return url ? `<span class="foto-venc so-ver"><img src="${url}" alt="" /> Foto do vencedor</span>` : "";
+    return `<label class="foto-venc" title="Foto usada no último slide da Apresentação">
+      ${url ? `<img src="${url}" alt="" /> Trocar foto do vencedor` : `${ico("camera")} Adicionar foto do vencedor`}
+      <input type="file" accept="image/png,image/webp,image/jpeg" hidden data-foto-vencedor="${esc(l.pessoa.id)}" />
+    </label>`;
+  }
+
+  async function enviarFotoVencedor(input, linhas, el) {
+    const arquivo = input.files?.[0];
+    const l = linhas.find((x) => x.pessoa.id === input.dataset.fotoVencedor);
+    if (!arquivo || !l) return;
+    const nome = nomeBonito(l.pessoa.nome);
+    const r = await executar(
+      async () => {
+        const dados = await S.prepararFoto(arquivo);
+        let id = l.pessoa.id;
+        if (l.pessoa.daPlanilha) {
+          const nova = await S.salvarPessoa({ nome: l.pessoa.nome, categoria: l.pessoa.categoria || "adm", setor: "" });
+          await S.salvarPessoa({ id: nova.id, nome: nova.nome, categoria: nova.categoria, setor: "", ativo: false });
+          id = nova.id;
+        }
+        await S.salvarFoto(id, dados);
+      },
+      { carregando: "Enviando foto…", concluido: "Foto do vencedor salva", detalhe: `<b>${esc(nome)}</b><br>Ela aparece no último slide da Apresentação.` },
+    );
+    if (r.ok) renderVisao(el);
   }
 
   // Publicação no site: o ranking, os números e o vencedor de um ano só aparecem na página
