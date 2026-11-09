@@ -180,6 +180,21 @@
     return pessoa;
   }
 
+  // Foto do colaborador: URL com a versão (data de envio) para o navegador não usar a antiga.
+  function fotoUrl(pessoa) {
+    return pessoa?.fotoEm ? `api/pessoas/${encodeURIComponent(pessoa.id)}/foto?v=${Date.parse(pessoa.fotoEm) || 1}` : null;
+  }
+
+  async function salvarFoto(id, dataUrl) {
+    await api(`pessoas/${encodeURIComponent(id)}/foto`, { metodo: "PUT", corpo: { dados: dataUrl } });
+    await aposEscrita();
+  }
+
+  async function removerFoto(id) {
+    await api(`pessoas/${encodeURIComponent(id)}/foto`, { metodo: "DELETE" });
+    await aposEscrita();
+  }
+
   async function excluirPessoa(id) {
     const r = await api(`pessoas/${encodeURIComponent(id)}`, { metodo: "DELETE" });
     await aposEscrita();
@@ -362,6 +377,9 @@
     listarPessoas,
     salvarPessoa,
     excluirPessoa,
+    fotoUrl,
+    salvarFoto,
+    removerFoto,
     listarLancamentos,
     registrarLancamento,
     excluirLancamento,

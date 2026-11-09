@@ -155,6 +155,14 @@ img { max-width: 100%; }
 .btn-sm { min-height: 32px; padding: 6px 12px; font-size: 0.76rem; }
 .ev-nome { display: block; margin-top: 6px; }
 @media (max-width: 760px) { .field-wide { grid-column: auto; } .score-list { grid-template-columns: 1fr; } }
+/* Foto do colaborador */
+.pessoa-foto { display: block; width: 38px; height: 38px; border-radius: 8px; object-fit: cover; object-position: top; background: var(--soft-2); }
+.foto-linha { display: flex; align-items: center; gap: 16px; }
+.foto-prev { display: grid; place-items: center; flex: none; width: 110px; height: 110px; border: 1px dashed var(--line); border-radius: 12px; background: repeating-conic-gradient(var(--soft-2) 0% 25%, transparent 0% 50%) 50% / 16px 16px; overflow: hidden; }
+.foto-prev img { width: 100%; height: 100%; object-fit: contain; }
+.foto-prev b { font-size: 1.6rem; color: var(--muted); }
+.foto-acoes { display: grid; justify-items: start; gap: 8px; }
+.foto-acoes label.btn { cursor: pointer; }
 /* Visão geral em camadas */
 .pub-status { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 10px; padding: 6px 6px 6px 12px; border: 1px solid var(--line); border-radius: 999px; font-size: 0.8rem; color: var(--muted); }
 .pub-status b { color: var(--text); }

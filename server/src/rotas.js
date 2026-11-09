@@ -51,7 +51,7 @@ rotas.get("/saude", assincrono(async (req, res) => {
 
 async function lerTudo() {
   const [pessoas, lancamentos, atualizadoEm] = await Promise.all([
-    pool.query("SELECT * FROM pessoas ORDER BY nome"),
+    pool.query("SELECT p.*, f.atualizado_em AS foto_em FROM pessoas p LEFT JOIN pessoa_fotos f ON f.pessoa_id = p.id ORDER BY p.nome"),
     pool.query("SELECT * FROM lancamentos ORDER BY criado_em"),
     db.atualizadoEm(),
   ]);
@@ -227,6 +227,44 @@ async function salvarPessoa(req, res) {
 
 rotas.post("/pessoas", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 rotas.put("/pessoas/:id", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
+
+// ---------- Foto do colaborador ----------
+const TIPOS_FOTO = { "image/png": true, "image/webp": true, "image/jpeg": true };
+
+rotas.get("/pessoas/:id/foto", auth.exigir(), assincrono(async (req, res) => {
+  const { rows } = await pool.query("SELECT tipo, dados FROM pessoa_fotos WHERE pessoa_id = $1", [req.params.id]);
+  if (!rows[0]) return res.status(404).json({ erro: "Sem foto." });
+  res.set({ "Content-Type": rows[0].tipo, "Cache-Control": "private, max-age=604800" });
+  res.send(rows[0].dados);
+}));
+
+rotas.put("/pessoas/:id/foto", auth.exigir("admin", "rh"), assincrono(async (req, res) => {
+  const m = /^data:(image\/(?:png|webp|jpeg));base64,([A-Za-z0-9+/=]+)$/.exec(String(req.body?.dados || ""));
+  if (!m || !TIPOS_FOTO[m[1]]) throw new ErroDeUso("Envie uma imagem PNG, WebP ou JPG.");
+  const dados = Buffer.from(m[2], "base64");
+  if (dados.length > 3 * 1024 * 1024) throw new ErroDeUso("A foto ficou grande demais (máximo de 3 MB).");
+  await transacao(async (c) => {
+    const existe = await c.query("SELECT 1 FROM pessoas WHERE id = $1", [req.params.id]);
+    if (!existe.rowCount) throw new ErroDeUso("Colaborador não encontrado.", 404);
+    await c.query(
+      `INSERT INTO pessoa_fotos (pessoa_id, tipo, dados, atualizado_em) VALUES ($1, $2, $3, now())
+       ON CONFLICT (pessoa_id) DO UPDATE SET tipo = EXCLUDED.tipo, dados = EXCLUDED.dados, atualizado_em = now()`,
+      [req.params.id, m[1], dados],
+    );
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ ok: true });
+}));
+
+rotas.delete("/pessoas/:id/foto", auth.exigir("admin", "rh"), assincrono(async (req, res) => {
+  await transacao(async (c) => {
+    await c.query("DELETE FROM pessoa_fotos WHERE pessoa_id = $1", [req.params.id]);
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ ok: true });
+}));
 
 // Exclusão definitiva (só administrador). Os pontos da pessoa saem junto: lançamentos individuais
 // dela são apagados e, nos coletivos, ela é retirada da lista (o lançamento some se ficar vazio).

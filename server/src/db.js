@@ -121,6 +121,7 @@ const pessoaDoBanco = (r) => ({
   ativo: r.ativo,
   origem: r.origem,
   criadoEm: r.criado_em,
+  fotoEm: r.foto_em || null,
 });
 
 const lancamentoDoBanco = (r) => ({ ...r.dados, id: r.id, ano: r.ano, tipo: r.tipo, autorId: r.autor_id, criadoEm: r.criado_em });

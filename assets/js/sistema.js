@@ -1135,11 +1135,12 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Nome</th><th>Perfil</th><th>Setor / área</th><th>Origem</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Foto</th><th>Nome</th><th>Perfil</th><th>Setor / área</th><th>Origem</th><th>Status</th><th></th></tr></thead>
             <tbody>
               ${lista
                 .map(
                   (p) => `<tr class="${p.ativo ? "" : "inactive"}">
+                  <td>${S.fotoUrl(p) ? `<img class="pessoa-foto" src="${S.fotoUrl(p)}" alt="" loading="lazy" />` : `<span class="avatar sm">${esc(iniciais(p.nome))}</span>`}</td>
                   <td><strong>${esc(nomeBonito(p.nome))}</strong></td>
                   <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}</td>
                   <td>${esc(p.setor || "—")}</td>
@@ -1178,6 +1179,31 @@
     if (r.ok) render();
   }
 
+  // Reduz a foto no navegador (lado maior até 1000 px) mantendo a transparência.
+  function prepararFoto(arquivo) {
+    return new Promise((resolve, reject) => {
+      if (!/^image\//.test(arquivo.type)) return reject(new Error("Escolha um arquivo de imagem (PNG, WebP ou JPG)."));
+      const url = URL.createObjectURL(arquivo);
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * escala);
+        canvas.height = Math.round(img.naturalHeight * escala);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        let dados = canvas.toDataURL("image/webp", 0.9);
+        if (!dados.startsWith("data:image/webp")) dados = canvas.toDataURL("image/png");
+        resolve(dados);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Não foi possível ler a imagem."));
+      };
+      img.src = url;
+    });
+  }
+
   function formPessoa(p = {}) {
     abrirModal(
       p.id ? "Editar colaborador" : "Novo colaborador",
@@ -1188,17 +1214,52 @@
           ${Object.entries(R.categorias).map(([id, n]) => `<option value="${id}" ${p.categoria === id ? "selected" : ""}>${n}</option>`).join("")}
         </select></label>
         <label class="field"><span>Setor / área de atuação</span><input name="setor" value="${esc(p.setor || "")}" /></label>
+        <div class="field field-full"><span>Foto (aparece na apresentação do resultado)</span>
+          <div class="foto-linha">
+            <div class="foto-prev" id="fotoPrev">${S.fotoUrl(p) ? `<img src="${S.fotoUrl(p)}" alt="" />` : `<b>${esc(iniciais(p.nome || "?"))}</b>`}</div>
+            <div class="foto-acoes">
+              <label class="btn btn-ghost btn-sm">Escolher foto<input type="file" id="fotoArq" accept="image/png,image/webp,image/jpeg" hidden /></label>
+              <button type="button" class="link-btn danger" id="fotoRemover" ${S.fotoUrl(p) ? "" : "hidden"}>Remover foto</button>
+              <small class="muted">De preferência PNG com fundo transparente. A imagem é reduzida automaticamente antes de enviar.</small>
+            </div>
+          </div>
+        </div>
         ${p.id ? `<label class="check-line field-full"><input type="checkbox" name="ativo" ${p.ativo ? "checked" : ""} /> Participa da jornada (ativo)</label>` : ""}
         <p class="form-error field-full" id="pfErro"></p>
         <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Salvar</button></div>
       </form>`,
     );
+    let novaFoto = null;
+    let tirarFoto = false;
+    $("#fotoArq").addEventListener("change", async (e) => {
+      const arquivo = e.target.files?.[0];
+      if (!arquivo) return;
+      try {
+        novaFoto = await prepararFoto(arquivo);
+      } catch (err) {
+        return ($("#pfErro").textContent = err.message);
+      }
+      tirarFoto = false;
+      $("#fotoPrev").innerHTML = `<img src="${novaFoto}" alt="" />`;
+      $("#fotoRemover").hidden = false;
+    });
+    $("#fotoRemover").addEventListener("click", () => {
+      novaFoto = null;
+      tirarFoto = true;
+      $("#fotoPrev").innerHTML = `<b>${esc(iniciais(p.nome || "?"))}</b>`;
+      $("#fotoRemover").hidden = true;
+    });
     $("#pessoaForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
       if (!fd.get("nome").trim() || !fd.get("categoria")) return ($("#pfErro").textContent = "Preencha nome e perfil.");
       const r = await executar(
-        () => S.salvarPessoa({ id: p.id, nome: fd.get("nome"), categoria: fd.get("categoria"), setor: fd.get("setor"), ativo: p.id ? fd.get("ativo") === "on" : true }),
+        async () => {
+          const salvo = await S.salvarPessoa({ id: p.id, nome: fd.get("nome"), categoria: fd.get("categoria"), setor: fd.get("setor"), ativo: p.id ? fd.get("ativo") === "on" : true });
+          if (novaFoto) await S.salvarFoto(salvo.id, novaFoto);
+          else if (tirarFoto && p.id) await S.removerFoto(p.id);
+          return salvo;
+        },
         { carregando: "Salvando colaborador…", concluido: p.id ? "Colaborador atualizado" : "Colaborador cadastrado", detalhe: esc(fd.get("nome")) },
       );
       if (!r.ok) return ($("#pfErro").textContent = r.erro.message);
