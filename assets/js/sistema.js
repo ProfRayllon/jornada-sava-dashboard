@@ -73,7 +73,7 @@
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, visao: { verPendentes: false, verAtividades: false }, hist: { tipo: "all", busca: "", todosAnos: true }, ev: { tipo: "all" }, atividadeSel: {}, tipoLancamento: null };
+  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, ev: { tipo: "all" }, atividadeSel: {}, tipoLancamento: null };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
@@ -224,8 +224,8 @@
   }
 
   // ---------------- Visão geral ----------------
-  // Em camadas: indicadores → ranking (página inteira, com rolagem) → distribuição por nível →
-  // sem avaliação e atividade recente lado a lado, cada um com "ver todos".
+  // Em camadas: indicadores → ranking (página inteira, com rolagem) → distribuição por nível
+  // com o total de pessoas sem avaliação ao lado.
   function renderVisao(el) {
     const ano = state.ano;
     const linhas = S.calcularAno(ano);
@@ -237,7 +237,6 @@
     const totalCoins = linhas.reduce((t, l) => t + l.score, 0);
     const cobertura = avaliaveis.length ? Math.round(((avaliaveis.length - pendentes.length) / avaliaveis.length) * 100) : 0;
     const f = state.filtros;
-    const v = state.visao;
 
     const filtradas = linhas.filter((l) => {
       if (f.area !== "all" && l.pessoa.categoria !== f.area) return false;
@@ -250,9 +249,6 @@
     const maxNivel = Math.max(1, ...porNivel.map((x) => x.qtd));
     const maior = [...porNivel].sort((a, b) => b.qtd - a.qtd)[0];
 
-    const recentes = [...lancs].sort((a, b) => b.criadoEm.localeCompare(a.criadoEm));
-    const LIM_PEND = 8;
-    const LIM_ATV = 6;
     const podeAvaliar = perfis[state.usuario.perfil].tipos.includes("avaliacao");
     const tagArea = (cat) => (cat ? `<span class="area-tag area-${cat}">${cat === "adv" ? "ADV" : "ADM"}</span>` : "");
 
@@ -308,47 +304,35 @@
         </div>
       </section>
 
-      <section class="card lv-card">
-        <div class="card-head">
-          <div><h2>Distribuição por nível</h2><p class="muted">${maior && maior.qtd ? `${fmt(maior.qtd)} de ${fmt(linhas.length)} pessoas estão em <b>${maior.n.nome}</b>. Clique num nível para filtrar o ranking.` : "Ainda sem pontuação."}</p></div>
-        </div>
-        <div class="lv-chart" role="list">
-          ${porNivel
-            .map(({ n, qtd }) => {
-              const pct = linhas.length ? Math.round((qtd / linhas.length) * 100) : 0;
-              const dica = `${n.nome}: ${fmt(qtd)} pessoa(s), ${pct}% · faixa ${n.faixa} Savacoins acumulados`;
-              return `<button type="button" class="lv-bar ${f.nivel === n.slug ? "active" : ""}" data-nivel="${n.slug}" role="listitem" title="${dica}" aria-label="${dica}">
-                <span class="lv-name"><span class="level level-${n.slug}">${n.nome}</span><small>${n.faixa}</small></span>
-                <span class="lv-plot"><i class="level-bg-${n.slug}" style="width:${qtd ? Math.max(1.5, (qtd / maxNivel) * 100) : 0}%"></i></span>
-                <span class="lv-val"><b>${fmt(qtd)}</b><small>${pct}%</small></span>
-              </button>`;
-            })
-            .join("")}
-        </div>
-      </section>
-
-      <section class="grid-duo">
-        <div class="card">
-          <div class="card-head"><div><h2>Sem avaliação no ano</h2><p class="muted small">Colaboradores ainda sem nenhuma avaliação em ${ano}.</p></div><span class="chip">${pendentes.length}</span></div>
-          <ul class="mini-list ${v.verPendentes ? "expandida" : ""}">
-            ${(v.verPendentes ? pendentes : pendentes.slice(0, LIM_PEND))
-              .map(
-                (l) => `<li><span>${esc(nomeBonito(l.pessoa.nome))}${tagArea(l.pessoa.categoria)}</span>
-                ${podeAvaliar ? `<button class="link-btn" data-avaliar="${l.pessoa.id}">Avaliar</button>` : ""}</li>`,
-              )
-              .join("") || `<li class="ok">Todas as pessoas já têm avaliação em ${ano} ✓</li>`}
-          </ul>
-          ${pendentes.length > LIM_PEND ? `<button type="button" class="ver-todos" data-ver="pendentes">${v.verPendentes ? "Mostrar menos" : `Ver todos (${pendentes.length})`}</button>` : ""}
+      <section class="grid-niveis">
+        <div class="card lv-card">
+          <div class="card-head">
+            <div><h2>Distribuição por nível</h2><p class="muted">${maior && maior.qtd ? `${fmt(maior.qtd)} de ${fmt(linhas.length)} pessoas estão em <b>${maior.n.nome}</b>. Clique num nível para filtrar o ranking.` : "Ainda sem pontuação."}</p></div>
+          </div>
+          <div class="lv-chart" role="list">
+            ${porNivel
+              .map(({ n, qtd }) => {
+                const pct = linhas.length ? Math.round((qtd / linhas.length) * 100) : 0;
+                const dica = `${n.nome}: ${fmt(qtd)} pessoa(s), ${pct}% · faixa ${n.faixa} Savacoins acumulados`;
+                return `<button type="button" class="lv-bar ${f.nivel === n.slug ? "active" : ""}" data-nivel="${n.slug}" role="listitem" title="${dica}" aria-label="${dica}">
+                  <span class="lv-name"><span class="level level-${n.slug}">${n.nome}</span><small>${n.faixa}</small></span>
+                  <span class="lv-plot"><i class="level-bg-${n.slug}" style="width:${qtd ? Math.max(1.5, (qtd / maxNivel) * 100) : 0}%"></i></span>
+                  <span class="lv-val"><b>${fmt(qtd)}</b><small>${pct}%</small></span>
+                </button>`;
+              })
+              .join("")}
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-head"><div><h2>Atividade recente</h2><p class="muted small">Últimos lançamentos de ${ano}.</p></div><span class="chip">${recentes.length}</span></div>
-          <ul class="activity ${v.verAtividades ? "expandida" : ""}">
-            ${(v.verAtividades ? recentes : recentes.slice(0, LIM_ATV))
-              .map((l) => `<li><span class="type-dot" style="background:${tipos[l.tipo].cor}">${tipos[l.tipo].icone}</span><div><strong>${tipos[l.tipo].nome}${l.titulo ? ` · ${esc(l.titulo)}` : ""}</strong><small>${esc(resumoPessoas(l))} · ${esc(l.autorNome)} · ${dataBr(l.data)}</small></div></li>`)
-              .join("") || `<li class="muted small">Nenhum lançamento ainda. Os registros feitos aqui aparecem no painel em tempo real.</li>`}
-          </ul>
-          ${recentes.length > LIM_ATV ? `<button type="button" class="ver-todos" data-ver="atividades">${v.verAtividades ? "Mostrar menos" : `Ver todas (${recentes.length})`}</button>` : ""}
+        <div class="card pend-card">
+          <span class="pend-kicker">Sem avaliação em ${ano}</span>
+          <strong class="pend-num">${fmt(pendentes.length)}</strong>
+          <p class="muted small">${pendentes.length ? `de ${fmt(avaliaveis.length)} colaboradores ainda não receberam nenhuma avaliação no ano.` : "Todos os colaboradores já têm avaliação no ano ✓"}</p>
+          <div class="pend-split">
+            <span><b>${fmt(pendentes.filter((l) => l.pessoa.categoria === "adm").length)}</b> ADM</span>
+            <span><b>${fmt(pendentes.filter((l) => l.pessoa.categoria === "adv").length)}</b> ADV</span>
+          </div>
+          ${podeAvaliar ? `<button type="button" class="btn btn-gold" id="irAvaliar">Avaliar</button>` : ""}
         </div>
       </section>`;
 
@@ -378,15 +362,7 @@
         $("#rankingCard", el).scrollIntoView({ behavior: "smooth", block: "start" });
       }),
     );
-    $$("[data-ver]", el).forEach((b) =>
-      b.addEventListener("click", () => {
-        const chave = b.dataset.ver === "pendentes" ? "verPendentes" : "verAtividades";
-        v[chave] = !v[chave];
-        const y = window.scrollY;
-        renderVisao(el);
-        window.scrollTo({ top: y });
-      }),
-    );
+    $("#irAvaliar", el)?.addEventListener("click", () => irPara("lancar", { tipoLancamento: "avaliacao", pessoaPreSelecionada: null }));
     const tbody = el.querySelector(".ranking tbody");
     tbody.addEventListener("click", (e) => {
       const tr = e.target.closest("[data-pessoa]");
@@ -396,9 +372,6 @@
       const tr = e.target.closest("[data-pessoa]");
       if (tr && e.key === "Enter") abrirPessoa(tr.dataset.pessoa);
     });
-    $$("[data-avaliar]", el).forEach((b) =>
-      b.addEventListener("click", () => irPara("lancar", { tipoLancamento: "avaliacao", pessoaPreSelecionada: b.dataset.avaliar })),
-    );
   }
 
   function kpi(rotulo, valor, sub, progresso) {

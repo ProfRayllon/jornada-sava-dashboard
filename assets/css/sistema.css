@@ -156,6 +156,15 @@ img { max-width: 100%; }
 .ev-nome { display: block; margin-top: 6px; }
 @media (max-width: 760px) { .field-wide { grid-column: auto; } .score-list { grid-template-columns: 1fr; } }
 /* Visão geral em camadas */
+.grid-niveis { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 22px; margin-top: 22px; align-items: stretch; }
+.grid-niveis .lv-card { margin-top: 0; }
+.pend-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.pend-kicker { font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.pend-num { font-size: 3.2rem; line-height: 1; font-weight: 800; }
+.pend-split { display: flex; gap: 18px; margin: 4px 0 6px; font-size: 0.82rem; color: var(--muted); }
+.pend-split b { color: var(--text); font-size: 1rem; margin-right: 4px; }
+.pend-card .btn { margin-top: auto; width: 100%; justify-content: center; }
+@media (max-width: 1100px) { .grid-niveis { grid-template-columns: 1fr; } }
 #rankingCard, .lv-card { margin-top: 22px; }
 .ranking-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .ranking-bar .legend { margin: 0; }
