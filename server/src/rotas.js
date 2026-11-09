@@ -194,6 +194,27 @@ async function salvarPessoa(req, res) {
 rotas.post("/pessoas", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 rotas.put("/pessoas/:id", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 
+// Exclusão definitiva (só administrador). Os pontos da pessoa saem junto: lançamentos individuais
+// dela são apagados e, nos coletivos, ela é retirada da lista (o lançamento some se ficar vazio).
+rotas.delete("/pessoas/:id", auth.exigir("admin"), assincrono(async (req, res) => {
+  const id = req.params.id;
+  const resumo = await transacao(async (c) => {
+    const existe = await c.query("SELECT 1 FROM pessoas WHERE id = $1", [id]);
+    if (!existe.rowCount) throw new ErroDeUso("Colaborador não encontrado.", 404);
+    const individuais = await c.query("DELETE FROM lancamentos WHERE dados->>'pessoaId' = $1", [id]);
+    const coletivos = await c.query(
+      "UPDATE lancamentos SET dados = jsonb_set(dados, '{pessoaIds}', (dados->'pessoaIds') - $1::text) WHERE dados->'pessoaIds' ? $1",
+      [id],
+    );
+    const vazios = await c.query("DELETE FROM lancamentos WHERE jsonb_typeof(dados->'pessoaIds') = 'array' AND jsonb_array_length(dados->'pessoaIds') = 0");
+    await c.query("DELETE FROM pessoas WHERE id = $1", [id]);
+    await tocar(c);
+    return { lancamentosRemovidos: individuais.rowCount + vazios.rowCount, lancamentosAjustados: coletivos.rowCount - vazios.rowCount };
+  });
+  avisarTodos();
+  res.json({ ok: true, ...resumo });
+}));
+
 // ---------- Eventos (atividades) ----------
 // Encontros, eventos, missões e ciclos de avaliação. Todo lançamento desses tipos aponta para um
 // evento e herda dele a data e o ano, então não há como lançar no ano errado.

@@ -180,6 +180,12 @@
     return pessoa;
   }
 
+  async function excluirPessoa(id) {
+    const r = await api(`pessoas/${encodeURIComponent(id)}`, { metodo: "DELETE" });
+    await aposEscrita();
+    return r;
+  }
+
   // ---------- Lançamentos ----------
   function listarLancamentos() {
     return db?.lancamentos || [];
@@ -313,6 +319,7 @@
     salvarUsuario,
     listarPessoas,
     salvarPessoa,
+    excluirPessoa,
     listarLancamentos,
     registrarLancamento,
     excluirLancamento,

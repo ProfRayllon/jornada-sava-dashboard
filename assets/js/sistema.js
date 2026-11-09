@@ -1095,7 +1095,7 @@
                   <td>${esc(p.setor || "—")}</td>
                   <td>${p.origem === "base" ? "Planilha 2026" : "Sistema"}</td>
                   <td><span class="status ${p.ativo ? "on" : ""}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
-                  <td><button class="link-btn" data-editar="${p.id}">Editar</button></td>
+                  <td><div class="row-actions"><button class="link-btn" data-editar="${p.id}">Editar</button>${state.usuario.perfil === "admin" ? `<button class="link-btn danger" data-excluir-pessoa="${p.id}">Excluir</button>` : ""}</div></td>
                 </tr>`,
                 )
                 .join("")}
@@ -1104,7 +1104,27 @@
         </div>
       </div>`;
     $("#novaPessoa", el).addEventListener("click", () => formPessoa());
+    $$("[data-excluir-pessoa]", el).forEach((b) => b.addEventListener("click", () => excluirPessoa(b.dataset.excluirPessoa)));
     $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formPessoa(S.listarPessoas().find((p) => p.id === b.dataset.editar))));
+  }
+
+  // Exclusão definitiva (só administrador). Avisa quantos lançamentos com pontos da pessoa serão afetados.
+  async function excluirPessoa(id) {
+    const p = S.listarPessoas().find((x) => x.id === id);
+    if (!p) return;
+    const lancs = S.listarLancamentos().filter((l) => l.pessoaId === id || l.pessoaIds?.includes(id));
+    const nome = nomeBonito(p.nome);
+    const aviso = lancs.length
+      ? `${nome} tem ${lancs.length} lançamento(s) com pontos no sistema. Ao excluir, esses pontos também serão apagados.\n\nSe a ideia é só tirar a pessoa da Jornada mantendo o histórico, use Editar e desmarque "ativo".\n\nExcluir mesmo assim? Esta ação não pode ser desfeita.`
+      : `Excluir ${nome} da Jornada? Esta ação não pode ser desfeita.`;
+    if (!confirm(aviso)) return;
+    try {
+      await S.excluirPessoa(id);
+    } catch (err) {
+      return toast(err.message);
+    }
+    toast(`${nome} foi excluído(a).`);
+    render();
   }
 
   function formPessoa(p = {}) {
