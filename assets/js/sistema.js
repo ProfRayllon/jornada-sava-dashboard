@@ -1179,30 +1179,8 @@
     if (r.ok) render();
   }
 
-  // Reduz a foto no navegador (lado maior até 1000 px) mantendo a transparência.
-  function prepararFoto(arquivo) {
-    return new Promise((resolve, reject) => {
-      if (!/^image\//.test(arquivo.type)) return reject(new Error("Escolha um arquivo de imagem (PNG, WebP ou JPG)."));
-      const url = URL.createObjectURL(arquivo);
-      const img = new Image();
-      img.onload = () => {
-        const escala = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
-        const canvas = document.createElement("canvas");
-        canvas.width = Math.round(img.naturalWidth * escala);
-        canvas.height = Math.round(img.naturalHeight * escala);
-        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
-        let dados = canvas.toDataURL("image/webp", 0.9);
-        if (!dados.startsWith("data:image/webp")) dados = canvas.toDataURL("image/png");
-        resolve(dados);
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error("Não foi possível ler a imagem."));
-      };
-      img.src = url;
-    });
-  }
+  // A redução da foto (mantendo a transparência) fica na camada de dados, compartilhada com a apresentação.
+  const prepararFoto = (arquivo) => S.prepararFoto(arquivo);
 
   function formPessoa(p = {}) {
     abrirModal(

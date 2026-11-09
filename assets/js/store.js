@@ -185,6 +185,31 @@
     return pessoa?.fotoEm ? `api/pessoas/${encodeURIComponent(pessoa.id)}/foto?v=${Date.parse(pessoa.fotoEm) || 1}` : null;
   }
 
+  // Reduz a foto no navegador (lado maior até 1000 px) mantendo a transparência; devolve um data URL.
+  function prepararFoto(arquivo) {
+    return new Promise((resolve, reject) => {
+      if (!/^image\//.test(arquivo?.type || "")) return reject(new Error("Escolha um arquivo de imagem (PNG, WebP ou JPG)."));
+      const url = URL.createObjectURL(arquivo);
+      const img = new Image();
+      img.onload = () => {
+        const escala = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.naturalWidth * escala);
+        canvas.height = Math.round(img.naturalHeight * escala);
+        canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        let dados = canvas.toDataURL("image/webp", 0.9);
+        if (!dados.startsWith("data:image/webp")) dados = canvas.toDataURL("image/png");
+        resolve(dados);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Não foi possível ler a imagem."));
+      };
+      img.src = url;
+    });
+  }
+
   async function salvarFoto(id, dataUrl) {
     await api(`pessoas/${encodeURIComponent(id)}/foto`, { metodo: "PUT", corpo: { dados: dataUrl } });
     await aposEscrita();
@@ -378,6 +403,7 @@
     salvarPessoa,
     excluirPessoa,
     fotoUrl,
+    prepararFoto,
     salvarFoto,
     removerFoto,
     listarLancamentos,

@@ -117,6 +117,7 @@
             <select id="apreAno">${anos.map((a) => `<option value="${a}" ${a === st.ano ? "selected" : ""}>Jornada ${a}</option>`).join("")}</select>
           </label>
           <p class="apre-resumo">${d.pontuados ? `${fmt(d.pessoas)} colaboradores · ${fmt(d.total)} Savacoins · ${fmt(d.totalSelos)} selos` : "Este ano ainda não tem pontuação."}</p>
+          ${listaFotos(d)}
           <div class="apre-acoes">
             <button type="button" class="apre-btn apre-btn-ouro" id="apreIniciar">Iniciar apresentação</button>
             <button type="button" class="apre-btn" id="apreIniciarCheia">Iniciar em tela cheia</button>
@@ -128,11 +129,64 @@
       st.ano = Number(e.target.value);
       renderInicio();
     });
+    $$("[data-foto-de]", raiz).forEach((input) => input.addEventListener("change", () => enviarFotoDestaque(input, d)));
     $("#apreIniciar", raiz).addEventListener("click", () => irCena(0));
     $("#apreIniciarCheia", raiz).addEventListener("click", () => {
       irCena(0);
       telaCheia(true);
     });
+  }
+
+  // ---------- Fotos dos destaques (tela inicial) ----------
+  // Vencedor e top 5 sem foto aparecem com as iniciais; daqui dá para enviar a foto de cada um.
+  // Quem só existe numa planilha antiga (ex.: vencedor de 2025 que não está no cadastro atual) ganha
+  // um cadastro inativo, só para guardar a foto: não entra nos rankings dos anos atuais.
+  function podeEditarFotos() {
+    return ["admin", "rh"].includes(S.usuarioAtual()?.perfil);
+  }
+
+  function listaFotos(d) {
+    const destaques = [...d.vencedores, ...d.destaques];
+    if (!destaques.length) return "";
+    const faltam = destaques.filter((l) => l.pessoa.daPlanilha || !S.fotoUrl(l.pessoa));
+    if (!faltam.length) return `<p class="apre-fotos-ok">✓ Vencedor e destaques com foto</p>`;
+    return `<div class="apre-fotos">
+      <p><b>${faltam.length} destaque(s) sem foto</b> · aparecem com as iniciais</p>
+      <ul>${faltam
+        .map(
+          (l) => `<li>
+          <span class="ap-av">${esc(iniciais(l.pessoa.nome))}</span>
+          <span class="apre-fotos-nome"><b>${d.linhas.indexOf(l) + 1}º · ${esc(nomeBonito(l.pessoa.nome))}</b><small>${l.pessoa.daPlanilha ? "Fora do cadastro atual" : R.categorias[l.pessoa.categoria] || ""}</small></span>
+          ${podeEditarFotos() ? `<label class="apre-btn apre-btn-mini">Adicionar foto<input type="file" accept="image/png,image/webp,image/jpeg" hidden data-foto-de="${esc(l.pessoa.id)}" /></label>` : ""}
+        </li>`,
+        )
+        .join("")}</ul>
+    </div>`;
+  }
+
+  async function enviarFotoDestaque(input, d) {
+    const arquivo = input.files?.[0];
+    const linha = d.linhas.find((l) => l.pessoa.id === input.dataset.fotoDe);
+    if (!arquivo || !linha) return;
+    const li = input.closest("li");
+    const rotulo = input.closest("label");
+    li.classList.add("enviando");
+    rotulo.firstChild.textContent = "Enviando…";
+    try {
+      const dados = await S.prepararFoto(arquivo);
+      let id = linha.pessoa.id;
+      if (linha.pessoa.daPlanilha) {
+        const nova = await S.salvarPessoa({ nome: linha.pessoa.nome, categoria: linha.pessoa.categoria || "adm", setor: "" });
+        await S.salvarPessoa({ id: nova.id, nome: nova.nome, categoria: nova.categoria, setor: "", ativo: false });
+        id = nova.id;
+      }
+      await S.salvarFoto(id, dados);
+      renderInicio();
+    } catch (err) {
+      li.classList.remove("enviando");
+      rotulo.firstChild.textContent = "Tentar de novo";
+      $(".apre-fotos-nome small", li).textContent = err.message;
+    }
   }
 
   function fundo(intenso = false) {
@@ -218,11 +272,11 @@
       return `<div class="c-numeros">
         <p class="apre-kicker">Jornada SAVA ${d.ano} em números</p>
         <h2 class="apre-titulo">Um ano de conquistas</h2>
-        <div class="num-grid">
+        <div class="ap-num-grid">
           ${blocos
             .map(
-              (b, i) => `<div class="num ${b.grande ? "grande" : ""}" style="--i:${i}">
-              <span class="num-ico">${icone(b.i)}</span>
+              (b, i) => `<div class="ap-num ${b.grande ? "grande" : ""}" style="--i:${i}">
+              <span class="ap-num-ico">${icone(b.i)}</span>
               <div><strong data-count="${b.v}">0</strong><span>${b.r}</span></div>
             </div>`,
             )
