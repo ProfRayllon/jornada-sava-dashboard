@@ -125,6 +125,17 @@ const pessoaDoBanco = (r) => ({
   fotoEm: r.foto_em || null,
 });
 
+const cicloDoBanco = (r) => ({
+  id: r.id,
+  nome: r.nome,
+  inicio: r.inicio,
+  fim: r.fim,
+  tetoFelicidade: r.teto_felicidade,
+  tetoEventos: r.teto_eventos,
+  publicado: r.publicado,
+  anoBase: r.ano_base,
+});
+
 const lancamentoDoBanco = (r) => ({ ...r.dados, id: r.id, ano: r.ano, tipo: r.tipo, autorId: r.autor_id, criadoEm: r.criado_em });
 
 const atividadeDoBanco = (r) => ({
@@ -150,6 +161,7 @@ module.exports = {
   atualizadoEm,
   usuarioPublico,
   pessoaDoBanco,
+  cicloDoBanco,
   lancamentoDoBanco,
   atividadeDoBanco,
 };

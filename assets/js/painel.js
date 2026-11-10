@@ -324,8 +324,16 @@ function renderYearTabs() {
   if (!select || !years.length) return;
   if (!state.years.has(state.activeYear)) state.activeYear = years[0];
   select.innerHTML = years
-    .map((year, i) => `<option value="${year}" ${year === state.activeYear ? "selected" : ""}>${i === 0 ? `Jornada ${year}` : `Resultado ${year}`}</option>`)
+    .map((year, i) => `<option value="${year}" ${year === state.activeYear ? "selected" : ""}>${rotuloDoPeriodo(state.years.get(year), i === 0)}</option>`)
     .join("");
+}
+
+// Nome do período no seletor: ciclos com nome próprio ("1º semestre de 2027") aparecem como estão;
+// os anos das planilhas mantêm "Jornada 2026" (mais recente) e "Resultado 2025".
+function rotuloDoPeriodo(yearData, maisRecente) {
+  const label = yearData?.label || "";
+  if (!/^\d{4}$/.test(label)) return label;
+  return maisRecente ? `Jornada ${label}` : `Resultado ${label}`;
 }
 
 function setActiveYear(year) {
@@ -426,7 +434,7 @@ function parseProcessedYear(rawYear) {
 
   return {
     year: Number(rawYear.year),
-    label: String(rawYear.year),
+    label: String(rawYear.label || rawYear.year),
     file: rawYear.source || "",
     people,
     ranking,
@@ -699,7 +707,7 @@ function render() {
   renderWinner(yearData);
   renderRanking();
   renderBadges(yearData);
-  els.rankingTitle.textContent = `Ranking ${yearData.year}`;
+  els.rankingTitle.textContent = `Ranking ${yearData.label}`;
   els.lastUpdated.textContent = yearData.updatedAt.getTime()
     ? `Atualizado em ${formatDateTime(yearData.updatedAt)}`
     : "Aguardando dados";
@@ -707,7 +715,7 @@ function render() {
 
 function renderWinner(yearData) {
   const winner = yearData.ranking[0];
-  els.winnerKicker.textContent = `Destaque ${yearData.year}`;
+  els.winnerKicker.textContent = `Destaque ${yearData.label}`;
   if (!winner) {
     els.winnerName.textContent = "Sem dados";
     els.winnerScore.textContent = "0";

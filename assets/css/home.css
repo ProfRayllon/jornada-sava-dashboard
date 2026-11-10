@@ -387,3 +387,5 @@ p { margin: 0; }
   .footer-bottom { flex-direction: column; align-items: flex-start; }
   .footer-dev { padding-right: 0; }
 }
+
+.champion-year.longo { font-size: 1.5rem; line-height: 1.15; }

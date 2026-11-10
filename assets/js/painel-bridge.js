@@ -1,5 +1,7 @@
 // Alimenta o painel (app.js) com os lançamentos feitos no sistema, por cima da base das planilhas.
 // Carregado depois de dados-painel.js e antes de app.js.
+// O painel trabalha com "anos" numéricos; aqui cada ciclo vira um desses períodos, com a chave de
+// S.chavePainel (2025, 2026 para as planilhas; 20270101 etc. para os ciclos novos) e o nome do ciclo.
 (function () {
   const R = window.SAVA_REGRAS;
   const S = window.SAVA_STORE;
@@ -9,30 +11,31 @@
   const selosDoPainel = new Set(["happy", "bright", "inspire"]);
   const reguaSelo = { adm: { bright: 1500, inspire: 2000 }, adv: { bright: 1900, inspire: 2000 } };
 
-  // Anos que o sistema recalcula: o de referência das regras e todo ano com lançamento
-  // (ex.: 2027 ganha sua aba no painel assim que receber o primeiro lançamento).
-  function anosDoSistema(db) {
-    const anos = new Set([R.anoAtual]);
-    db.lancamentos.forEach((l) => l.ano && anos.add(Number(l.ano)));
-    return [...anos];
-  }
-
   function montar() {
     const dados = JSON.parse(JSON.stringify(original));
     const db = S.lerDb();
     if (!db) return dados;
-    anosDoSistema(db).forEach((ano) => montarAno(dados, db, ano));
+    const ciclos = S.listarCiclos();
+    if (!ciclos.length) return dados;
+    const anos = {};
+    ciclos.forEach((ciclo) => {
+      const chave = S.chavePainel(ciclo);
+      const doCiclo = S.lancamentosDoCiclo(ciclo.id);
+      const base = ciclo.anoBase ? dados.years[String(ciclo.anoBase)] : null;
+      anos[chave] = {
+        ...(base || { source: "Lançamentos do sistema", highlights: [], notes: [] }),
+        year: chave,
+        label: S.rotuloCiclo(ciclo),
+        updatedAt: doCiclo.length || !base ? db.atualizadoEm : base.updatedAt,
+        people: pessoasDoCiclo(ciclo),
+      };
+    });
+    dados.years = anos;
     return dados;
   }
 
-  function montarAno(dados, db, anoNum) {
-    const ano = String(anoNum);
-    if (!dados.years[ano]) {
-      if (!db.lancamentos.some((l) => Number(l.ano) === anoNum)) return;
-      dados.years[ano] = { year: anoNum, source: "Lançamentos do sistema", updatedAt: db.atualizadoEm, people: [], highlights: [], notes: [] };
-    }
-
-    dados.years[ano].people = S.calcularAno(anoNum).map((linha) => {
+  function pessoasDoCiclo(ciclo) {
+    return S.calcularCiclo(ciclo.id).map((linha) => {
       const { pessoa, base, sistema } = linha;
       const badgeScores = { ...linha.badgeScores };
       linha.selos.forEach((selo) => {
@@ -55,8 +58,6 @@
         badgeScores,
       };
     });
-
-    if (db.lancamentos.some((l) => Number(l.ano) === anoNum)) dados.years[ano].updatedAt = db.atualizadoEm;
   }
 
   // painel.js espera esta promessa antes de ler JORNADA_SAVA_PANEL_DATA.

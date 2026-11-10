@@ -7,7 +7,7 @@
   const LEGADO_KEY = "sava.v1.db"; // base antiga, salva no navegador antes do PostgreSQL
   const ouvintes = new Set();
 
-  let db = null; // { usuarios, pessoas, lancamentos, atualizadoEm }
+  let db = null; // { usuarios, pessoas, lancamentos, atividades, ciclos, atualizadoEm }
   let eu = null; // usuário logado (null na homepage pública)
   let carregando = null;
   let eventos = null;
@@ -64,7 +64,7 @@
       estado = await api("publico");
     }
     eu = estado.eu || null;
-    db = { usuarios: estado.usuarios || [], coordenadores: estado.coordenadores || [], modeloAvaliacao: estado.modeloAvaliacao || null, pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], anosPublicados: estado.anosPublicados || null, atualizadoEm: estado.atualizadoEm };
+    db = { usuarios: estado.usuarios || [], coordenadores: estado.coordenadores || [], modeloAvaliacao: estado.modeloAvaliacao || null, pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], ciclos: estado.ciclos || null, atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
@@ -258,13 +258,57 @@
     await aposEscrita();
   }
 
-  // ---------- Anos publicados na homepage ----------
-  function anosPublicados() {
-    return db?.anosPublicados || [];
+  // ---------- Ciclos ----------
+  // Períodos definidos pelo administrador (ex.: "1º semestre de 2027"). Todo lançamento entra no
+  // ciclo que contém a sua data. Sem servidor (homepage sem API), os anos da base das planilhas
+  // viram ciclos anuais.
+  function ciclosDaBase() {
+    return Object.keys(BASE_PLANILHAS?.years || {})
+      .map(Number)
+      .map((a) => ({ id: `c${a}`, nome: `Jornada ${a}`, inicio: `${a}-01-01`, fim: `${a}-12-31`, tetoFelicidade: R.maxFelicidadeAno, tetoEventos: R.maxEventosAno, publicado: true, anoBase: a }));
   }
 
-  async function publicarAno(ano, publicado) {
-    await api(`anos-publicados/${Number(ano)}`, { metodo: "PUT", corpo: { publicado } });
+  // Do mais recente para o mais antigo.
+  function listarCiclos() {
+    const lista = db?.ciclos ? db.ciclos : ciclosDaBase(); // lista vazia do servidor = nenhum ciclo
+    return [...lista].sort((a, b) => b.inicio.localeCompare(a.inicio));
+  }
+
+  const cicloPorId = (id) => (id && typeof id === "object" ? id : listarCiclos().find((c) => c.id === id) || null);
+  const noCiclo = (c, data) => Boolean(c && data && data >= c.inicio && data <= c.fim);
+  const cicloDaData = (data) => listarCiclos().find((c) => noCiclo(c, data)) || null;
+  const ciclosPublicados = () => listarCiclos().filter((c) => c.publicado);
+  // Nome curto: os ciclos das planilhas aparecem só com o ano ("2026").
+  const rotuloCiclo = (c) => (c ? (c.anoBase ? String(c.anoBase) : c.nome) : "");
+  // Chave numérica do ciclo no painel (que ordena por número): os ciclos das planilhas mantêm o
+  // ano (2025, 2026) e os outros usam a data de início (20270101), sempre em ordem cronológica.
+  const chavePainel = (id) => {
+    const c = cicloPorId(id);
+    return c ? c.anoBase || Number(c.inicio.replace(/-/g, "")) : null;
+  };
+  const lancamentosDoCiclo = (id) => (db?.lancamentos || []).filter((l) => noCiclo(cicloPorId(id), l.data));
+  const atividadesDoCiclo = (id) => (db?.atividades || []).filter((a) => noCiclo(cicloPorId(id), a.data));
+
+  // Ciclo em andamento: o que contém a data de hoje; senão o último que já começou.
+  function cicloVigente() {
+    const hoje = new Date().toISOString().slice(0, 10);
+    const lista = listarCiclos();
+    return cicloDaData(hoje) || lista.find((c) => c.inicio <= hoje) || lista.at(-1) || null;
+  }
+
+  async function salvarCiclo(dados) {
+    const { ciclo } = await api(dados.id ? `ciclos/${encodeURIComponent(dados.id)}` : "ciclos", { metodo: dados.id ? "PUT" : "POST", corpo: dados });
+    await aposEscrita();
+    return ciclo;
+  }
+
+  async function publicarCiclo(id, publicado) {
+    await api(`ciclos/${encodeURIComponent(id)}/publicado`, { metodo: "PUT", corpo: { publicado } });
+    await aposEscrita();
+  }
+
+  async function excluirCiclo(id) {
+    await api(`ciclos/${encodeURIComponent(id)}`, { metodo: "DELETE" });
     await aposEscrita();
   }
 
@@ -289,34 +333,23 @@
 
   const pontosDoLancamento = R.pontosDoLancamento;
 
-  // Anos com dados: os da base das planilhas, os que já têm lançamento e o ano de referência.
-  function anosDisponiveis() {
-    const anos = new Set([R.anoAtual, ...Object.keys(BASE_PLANILHAS?.years || {}).map(Number)]);
-    (db?.lancamentos || []).forEach((l) => l.ano && anos.add(Number(l.ano)));
-    (db?.atividades || []).forEach((a) => a.ano && anos.add(Number(a.ano)));
-    return [...anos].filter(Boolean).sort((a, b) => b - a);
-  }
-
-  // Ano da Jornada em andamento: o mais recente que tem dados (ex.: 2027 assim que houver um lançamento em 2027).
-  function anoVigente() {
-    return anosDisponiveis()[0];
-  }
-
-  // Une a base importada das planilhas com os lançamentos do sistema para um ano.
-  // Num ano sem planilha (ex.: 2027), a pontuação do ano começa do zero, mas o nível
-  // continua acumulando a partir do ano anterior.
-  function calcularAno(ano) {
-    ano = Number(ano);
+  // Une a base importada das planilhas com os lançamentos do sistema para um ciclo.
+  // Num ciclo sem planilha, a pontuação começa do zero, mas o nível continua acumulando a partir
+  // do ciclo anterior. O selo "Sou feliz!" usa o teto de Felicidade do próprio ciclo.
+  function calcularCiclo(id) {
+    const ciclo = cicloPorId(id);
+    if (!ciclo) return [];
     const dados = db || { pessoas: [], lancamentos: [] };
-    const base = dadosBase(ano);
-    const menorAno = Math.min(...anosDisponiveis());
+    const base = ciclo.anoBase ? dadosBase(ciclo.anoBase) : null;
+    const anterior = listarCiclos().find((c) => c.inicio < ciclo.inicio);
     const nivelAnterior = new Map();
-    if (!base && ano - 1 >= menorAno) {
-      calcularAno(ano - 1).forEach((l) => nivelAnterior.set(l.pessoa.id, l.levelScore));
+    if (!base && anterior) {
+      calcularCiclo(anterior).forEach((l) => nivelAnterior.set(l.pessoa.id, l.levelScore));
     }
     const basePorChave = new Map((base?.people || []).map((p) => [p.key || normalizar(p.name), p]));
-    const lancamentos = dados.lancamentos.filter((l) => l.ano === Number(ano));
+    const lancamentos = dados.lancamentos.filter((l) => noCiclo(ciclo, l.data));
     const pilares = ["felicidade", "eventos", "tecnica", "socio", "competencias", "extras"];
+    const tetoFelicidade = ciclo.tetoFelicidade ?? R.maxFelicidadeAno;
 
     const daPlanilha = (p) => {
       const chave = p.key || normalizar(p.name);
@@ -326,8 +359,8 @@
     let pessoas;
     if (!dados.pessoas.length) {
       pessoas = (base?.people || []).map(daPlanilha);
-    } else if (base && ano !== R.anoAtual) {
-      // Ano fechado vindo de planilha (ex.: 2025): a planilha é a referência, porque o cadastro do
+    } else if (base && ciclo.anoBase !== R.anoAtual) {
+      // Ciclo fechado vindo de planilha (ex.: 2025): a planilha é a referência, porque o cadastro do
       // sistema foi importado da planilha de 2026 e os nomes mudam de um ano para o outro
       // ("DAVI DE ASSIS PINHEIRO DA SILVA" em 2025, "DAVI DE ASSIS" em 2026). Cada linha é ligada
       // ao colaborador cadastrado quando o nome bate; quem não está mais no cadastro aparece igual.
@@ -346,7 +379,7 @@
         usados.add(cadastro.id);
         return { ...cadastro, chaveBase: bp.key || normalizar(bp.name), ativo: true };
       });
-      // Colaboradores com lançamentos nesse ano que não constam na planilha.
+      // Colaboradores com lançamentos nesse ciclo que não constam na planilha.
       dados.pessoas
         .filter((p) => p.ativo && !usados.has(p.id) && lancamentos.some((l) => l.pessoaId === p.id || l.pessoaIds?.includes(p.id)))
         .forEach((p) => pessoas.push(p));
@@ -394,7 +427,7 @@
         const nivelBase = base ? linha.base.levelScore || linha.base.score : nivelAnterior.get(pessoa.id) || 0;
         linha.levelScore = nivelBase + somaSistema;
         linha.felicidadeTotal = linha.base.felicidade + linha.sistema.felicidade;
-        if (linha.felicidadeTotal >= R.maxFelicidadeAno) {
+        if (tetoFelicidade > 0 && linha.felicidadeTotal >= tetoFelicidade) {
           linha.selos.add("happy");
           linha.badgeScores.happy = linha.felicidadeTotal;
         }
@@ -428,15 +461,23 @@
     listarLancamentos,
     registrarLancamento,
     excluirLancamento,
-    anosPublicados,
-    publicarAno,
+    listarCiclos,
+    cicloPorId,
+    cicloDaData,
+    cicloVigente,
+    ciclosPublicados,
+    rotuloCiclo,
+    chavePainel,
+    salvarCiclo,
+    publicarCiclo,
+    excluirCiclo,
+    lancamentosDoCiclo,
+    atividadesDoCiclo,
     listarAtividades,
     salvarAtividade,
     excluirAtividade,
     pontosDoLancamento,
-    anosDisponiveis,
-    anoVigente,
-    temBase: (ano) => Boolean(dadosBase(ano)),
-    calcularAno,
+    temBase: (id) => Boolean(cicloPorId(id)?.anoBase && dadosBase(cicloPorId(id).anoBase)),
+    calcularCiclo,
   };
 })();

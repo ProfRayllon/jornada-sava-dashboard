@@ -4,7 +4,7 @@ const db = require("./db");
 const auth = require("./auth");
 const { gerarHash, conferir } = require("./senha");
 
-const { pool, uid, normalizar, transacao, tocar, usuarioPublico, pessoaDoBanco, lancamentoDoBanco, atividadeDoBanco } = db;
+const { pool, uid, normalizar, transacao, tocar, usuarioPublico, pessoaDoBanco, cicloDoBanco, lancamentoDoBanco, atividadeDoBanco } = db;
 const rotas = express.Router();
 
 const PERFIS = ["admin", "rh", "lider"];
@@ -58,14 +58,18 @@ async function lerTudo() {
   return { pessoas: pessoas.rows.map(pessoaDoBanco), lancamentos: lancamentos.rows.map(lancamentoDoBanco), atualizadoEm };
 }
 
-async function lerAnosPublicados(c = pool) {
-  const { rows } = await c.query("SELECT valor FROM meta WHERE chave = 'anos_publicados'");
-  try {
-    const anos = JSON.parse(rows[0]?.valor || "[]");
-    return Array.isArray(anos) ? anos.map(Number).filter(Boolean).sort((a, b) => a - b) : [];
-  } catch {
-    return [];
-  }
+// ---------- Ciclos ----------
+async function lerCiclos(c = pool) {
+  const { rows } = await c.query("SELECT * FROM ciclos ORDER BY inicio");
+  return rows.map(cicloDoBanco);
+}
+
+// Ciclo que contém a data (os ciclos não se sobrepõem).
+const cicloDaData = (ciclos, data) => ciclos.find((ci) => data >= ci.inicio && data <= ci.fim) || null;
+
+async function exigirCiclo(data, c = pool) {
+  if (!cicloDaData(await lerCiclos(c), data))
+    throw new ErroDeUso("Esta data não pertence a nenhum ciclo. Peça ao administrador para cadastrar o ciclo na Visão geral.");
 }
 
 // ---------- Modelo de avaliação (questionário editável pelo administrador) ----------
@@ -130,16 +134,19 @@ rotas.put("/modelo-avaliacao", auth.exigir("admin"), assincrono(async (req, res)
 }));
 
 // Homepage pública: só o necessário para somar o ranking, sem notas, feedbacks nem autores,
-// e só dos anos que o administrador publicou no site.
+// e só dos ciclos que o administrador publicou no site. Vão também os ciclos anteriores aos
+// publicados (sem aparecer no site), porque o nível acumula de um ciclo para o outro.
 rotas.get("/publico", assincrono(async (req, res) => {
   const { pessoas, lancamentos, atualizadoEm } = await lerTudo();
-  const anosPublicados = await lerAnosPublicados();
+  const todos = await lerCiclos();
+  const ultimoPublicado = todos.filter((ci) => ci.publicado).at(-1);
+  const ciclos = ultimoPublicado ? todos.filter((ci) => ci.inicio <= ultimoPublicado.inicio) : [];
   res.json({
-    anosPublicados,
+    ciclos,
     pessoas: pessoas.map(({ id, nome, chaveBase, categoria, ativo }) => ({ id, nome, chaveBase, categoria, ativo })),
-    lancamentos: lancamentos.filter((l) => anosPublicados.includes(l.ano)).map((l) => {
+    lancamentos: lancamentos.filter((l) => cicloDaData(ciclos, l.data)).map((l) => {
       const { selos, ...pontos } = R.pontosDoLancamento({ ...l, pessoaId: undefined, pessoaIds: undefined }, null);
-      return { id: l.id, ano: l.ano, bimestre: l.bimestre, pessoaId: l.pessoaId, pessoaIds: l.pessoaIds, tipo: "resumo", resumo: { ...pontos, selos } };
+      return { id: l.id, ano: l.ano, data: l.data, bimestre: l.bimestre, pessoaId: l.pessoaId, pessoaIds: l.pessoaIds, tipo: "resumo", resumo: { ...pontos, selos } };
     }),
     atualizadoEm,
   });
@@ -149,7 +156,7 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
   const tudo = await lerTudo();
   const { rows: atividades } = await pool.query("SELECT * FROM atividades ORDER BY data DESC, criado_em DESC");
   tudo.atividades = atividades.map(atividadeDoBanco);
-  tudo.anosPublicados = await lerAnosPublicados();
+  tudo.ciclos = await lerCiclos();
   let usuarios = [];
   if (req.usuario.perfil === "admin") {
     const { rows } = await pool.query("SELECT * FROM usuarios ORDER BY nome");
@@ -165,24 +172,66 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
   res.json({ eu: req.usuario, usuarios, coordenadores, modeloAvaliacao, ...tudo });
 }));
 
-// Publica ou oculta um ano na homepage (só administrador).
-rotas.put("/anos-publicados/:ano", auth.exigir("admin"), assincrono(async (req, res) => {
-  const ano = Number(req.params.ano);
-  if (!Number.isInteger(ano) || ano < 2025 || ano > new Date().getFullYear() + 1) throw new ErroDeUso("Ano inválido.");
-  const anosPublicados = await transacao(async (c) => {
-    const atuais = new Set(await lerAnosPublicados(c));
-    if (req.body?.publicado) atuais.add(ano);
-    else atuais.delete(ano);
-    const lista = [...atuais].sort((a, b) => a - b);
-    await c.query(
-      "INSERT INTO meta (chave, valor) VALUES ('anos_publicados', $1) ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor",
-      [JSON.stringify(lista)],
-    );
+// Cadastro de ciclos (só administrador). Não podem se sobrepor; os ciclos ligados às planilhas
+// (2025 e 2026) mantêm as datas, porque a base delas é do ano inteiro.
+const dataValida = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || "")) && !Number.isNaN(Date.parse(d));
+
+async function salvarCiclo(req, res) {
+  const b = req.body || {};
+  const id = req.params.id || null;
+  const nome = texto(b.nome, 80);
+  if (!nome) throw new ErroDeUso("Dê um nome ao ciclo (ex.: 1º semestre de 2027).");
+  const tetoFelicidade = Math.round(Number(b.tetoFelicidade ?? 2300));
+  const tetoEventos = Math.round(Number(b.tetoEventos ?? 700));
+  if (![tetoFelicidade, tetoEventos].every((n) => Number.isFinite(n) && n >= 0)) throw new ErroDeUso("Informe os tetos em Savacoins.");
+
+  const ciclo = await transacao(async (c) => {
+    const todos = await lerCiclos(c);
+    const atual = id ? todos.find((ci) => ci.id === id) : null;
+    if (id && !atual) throw new ErroDeUso("Ciclo não encontrado.", 404);
+    const inicio = atual?.anoBase ? atual.inicio : String(b.inicio || "");
+    const fim = atual?.anoBase ? atual.fim : String(b.fim || "");
+    if (!dataValida(inicio) || !dataValida(fim)) throw new ErroDeUso("Informe o início e o fim do ciclo.");
+    if (fim < inicio) throw new ErroDeUso("O fim do ciclo precisa ser depois do início.");
+    const choque = todos.find((ci) => ci.id !== id && inicio <= ci.fim && fim >= ci.inicio);
+    if (choque) throw new ErroDeUso(`O período choca com o ciclo “${choque.nome}”. Ajuste as datas de um dos dois.`);
+
+    const r = id
+      ? await c.query("UPDATE ciclos SET nome = $2, inicio = $3, fim = $4, teto_felicidade = $5, teto_eventos = $6 WHERE id = $1 RETURNING *", [id, nome, inicio, fim, tetoFelicidade, tetoEventos])
+      : await c.query("INSERT INTO ciclos (id, nome, inicio, fim, teto_felicidade, teto_eventos) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *", [uid("c"), nome, inicio, fim, tetoFelicidade, tetoEventos]);
     await tocar(c);
-    return lista;
+    return cicloDoBanco(r.rows[0]);
   });
   avisarTodos();
-  res.json({ anosPublicados });
+  res.json({ ciclo });
+}
+
+rotas.post("/ciclos", auth.exigir("admin"), assincrono(salvarCiclo));
+rotas.put("/ciclos/:id", auth.exigir("admin"), assincrono(salvarCiclo));
+
+// Publica ou oculta um ciclo na homepage.
+rotas.put("/ciclos/:id/publicado", auth.exigir("admin"), assincrono(async (req, res) => {
+  await transacao(async (c) => {
+    const r = await c.query("UPDATE ciclos SET publicado = $2 WHERE id = $1", [req.params.id, Boolean(req.body?.publicado)]);
+    if (!r.rowCount) throw new ErroDeUso("Ciclo não encontrado.", 404);
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ ok: true });
+}));
+
+rotas.delete("/ciclos/:id", auth.exigir("admin"), assincrono(async (req, res) => {
+  await transacao(async (c) => {
+    const ciclo = (await lerCiclos(c)).find((ci) => ci.id === req.params.id);
+    if (!ciclo) throw new ErroDeUso("Ciclo não encontrado.", 404);
+    if (ciclo.anoBase) throw new ErroDeUso("Este ciclo guarda a base das planilhas e não pode ser excluído.");
+    const { rows } = await c.query("SELECT count(*)::int AS n FROM lancamentos WHERE dados->>'data' BETWEEN $1 AND $2", [ciclo.inicio, ciclo.fim]);
+    if (rows[0].n) throw new ErroDeUso(`Este ciclo tem ${rows[0].n} lançamento(s). Exclua os lançamentos ou mude as datas antes de excluir o ciclo.`, 409);
+    await c.query("DELETE FROM ciclos WHERE id = $1", [ciclo.id]);
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ ok: true });
 }));
 
 // ---------- Sessão ----------
@@ -371,10 +420,9 @@ const TIPOS_ATIVIDADE = ["felicidade", "evento", "missao", "avaliacao"];
 
 function conferirData(data) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(data || "")) || Number.isNaN(Date.parse(data))) throw new ErroDeUso("Informe a data.");
-  // Do primeiro ano da Jornada até o ano seguinte ao atual (para já abrir a próxima Jornada).
+  // O período válido é o dos ciclos cadastrados (exigirCiclo); aqui só barra datas absurdas.
   const ano = Number(data.slice(0, 4));
-  const limiteAno = new Date().getFullYear() + 1;
-  if (ano < 2025 || ano > limiteAno) throw new ErroDeUso(`Data fora do período da Jornada (2025 a ${limiteAno}). Confira o ano digitado.`);
+  if (ano < 2025 || ano > 2100) throw new ErroDeUso("Data fora do período da Jornada. Confira o ano digitado.");
   return ano;
 }
 
@@ -385,6 +433,7 @@ async function salvarAtividade(req, res) {
   const titulo = texto(b.titulo, 200);
   if (!titulo) throw new ErroDeUso("Informe o nome do evento.");
   const ano = conferirData(b.data);
+  await exigirCiclo(b.data);
   let pontos = null;
   if (b.tipo !== "avaliacao") {
     pontos = Math.round(Number(b.pontos));
@@ -457,6 +506,7 @@ async function validarLancamento(b, usuario) {
   }
   const data = atividade ? atividade.data : String(b.data || "");
   conferirData(data);
+  await exigirCiclo(data);
   const bimestre = R.bimestreDaData(data);
   const dados = { tipo, data, titulo: atividade ? atividade.titulo : texto(b.titulo, 200), bimestre: bimestre?.id || null };
   if (atividade) dados.atividadeId = atividade.id;

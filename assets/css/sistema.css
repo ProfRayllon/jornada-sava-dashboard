@@ -770,3 +770,11 @@ img { max-width: 100%; }
 .quiz-grupo-titulo.feito .quiz-aba-check { opacity: 1; transform: none; }
 .quiz-abas-dica { justify-content: center; margin: 0; }
 .form-actions .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Lista de ciclos (Visão geral > Ciclos) */
+.ciclos-lista { display: grid; gap: 8px; margin: 14px 0 18px; }
+.ciclo-item { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.ciclo-item.atual { border-color: var(--gold); background: rgba(212, 178, 111, 0.08); }
+.ciclo-info { display: grid; gap: 2px; min-width: 0; }
+.ciclo-info small { color: var(--muted); font-size: 0.74rem; }
+@media (max-width: 560px) { .ciclo-item { grid-template-columns: 1fr auto; } .ciclo-item .row-actions { grid-column: 1 / -1; justify-content: flex-start; } }

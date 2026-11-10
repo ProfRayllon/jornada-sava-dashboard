@@ -26,6 +26,7 @@
 
   document.addEventListener("DOMContentLoaded", () => {
     $$("[data-ano-atual]").forEach((el) => (el.textContent = R.anoAtual));
+    $$("[data-ano-hoje]").forEach((el) => (el.textContent = new Date().getFullYear()));
     iniciarHeader();
     montarFluxo();
     montarPontuacao();
@@ -39,7 +40,7 @@
     Promise.resolve(S?.garantirDb())
       .catch(() => {})
       .finally(() => {
-        $$("[data-ano-atual]").forEach((el) => (el.textContent = anoVigente()));
+        $$("[data-ano-atual]").forEach((el) => (el.textContent = S?.rotuloCiclo(cicloVigente()) || R.anoAtual));
         montarNumeros();
         montarHall();
       });
@@ -77,25 +78,21 @@
   }
 
   // ---------- Números ----------
-  // Anos que aparecem no site: só os que o administrador publicou na Visão geral do sistema.
-  // Sem resposta do servidor, usa os anos da base das planilhas.
-  function anosNoSite() {
-    const db = S?.lerDb();
-    const pub = db?.anosPublicados;
-    const anos = new Set(Object.keys(window.JORNADA_SAVA_PANEL_DATA?.years || {}).map(Number));
-    if (db) S.anosDisponiveis().forEach((a) => anos.add(a));
-    (pub || []).forEach((a) => anos.add(a));
-    return [...anos].filter((a) => !pub || pub.includes(a)).sort((a, b) => b - a);
+  // Ciclos que aparecem no site: só os que o administrador publicou na Visão geral do sistema
+  // (do mais recente para o mais antigo). Sem servidor, os anos da base das planilhas.
+  function ciclosNoSite() {
+    return S ? S.ciclosPublicados() : [];
   }
 
-  // Ano em destaque no site: o mais recente publicado.
-  function anoVigente() {
-    return anosNoSite()[0] || R.anoAtual;
+  // Ciclo em destaque no site: o mais recente publicado.
+  function cicloVigente() {
+    return ciclosNoSite()[0] || null;
   }
 
-  function rankingDoAno(ano) {
-    if (S?.lerDb() && (Number(ano) >= R.anoAtual || S.listarLancamentos().some((l) => l.ano === Number(ano)))) {
-      return S.calcularAno(ano).map((l) => ({
+  function rankingDoCiclo(ciclo) {
+    if (!ciclo) return [];
+    if (S?.lerDb()) {
+      return S.calcularCiclo(ciclo.id).map((l) => ({
         name: l.pessoa.nome,
         category: R.categorias[l.pessoa.categoria] || "",
         score: l.score,
@@ -103,12 +100,12 @@
         badges: [...l.selos],
       }));
     }
-    const base = window.JORNADA_SAVA_PANEL_DATA?.years?.[String(ano)];
+    const base = window.JORNADA_SAVA_PANEL_DATA?.years?.[String(ciclo.anoBase)];
     return [...(base?.people || [])].sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
   }
 
   function montarNumeros() {
-    const ranking = rankingDoAno(anoVigente());
+    const ranking = rankingDoCiclo(cicloVigente());
     // Sem a base de dados (ex.: clone do repositório sem a pasta base/), a faixa de números some.
     if (!ranking.length) return ($(".numbers").hidden = true);
     $("#statPessoas").textContent = ranking.length;
@@ -323,8 +320,10 @@
   }
 
   function montarHall() {
-    const anos = anosNoSite();
-    const campeoes = anos.map((ano) => ({ ano, p: rankingDoAno(ano)[0] })).filter((c) => c.p);
+    const cicloSite = cicloVigente();
+    const campeoes = ciclosNoSite()
+      .map((c) => ({ ciclo: c, ano: S.rotuloCiclo(c), p: rankingDoCiclo(c)[0] }))
+      .filter((c) => c.p);
     if (!campeoes.length) {
       $("#vencedores").hidden = true;
       $$('a[href="#vencedores"]').forEach((a) => (a.hidden = true));
@@ -335,15 +334,15 @@
 
     stage.innerHTML = campeoes
       .map(
-        ({ ano, p }, i) => `
+        ({ ciclo, ano, p }, i) => `
         <article class="champion" data-i="${i}" aria-label="Campeão ${ano}">
           <div class="champion-photo">
-            <img src="${fotosVencedores[ano] || "assets/logo/sava-simbolo.png"}" alt="${nomeBonito(p.name)}" loading="lazy" />
+            <img src="${fotosVencedores[ciclo.anoBase] || "assets/logo/sava-simbolo.png"}" alt="${nomeBonito(p.name)}" loading="lazy" />
             <span class="crown">${icon("trophy")}</span>
           </div>
           <div>
-            <div class="champion-year">${ano}</div>
-            <span class="champion-tag">${ano >= anoVigente() ? "Destaque do ano · parcial" : "Campeão do ano"}</span>
+            <div class="champion-year${/^\d{4}$/.test(ano) ? "" : " longo"}">${ano}</div>
+            <span class="champion-tag">${ciclo.id === cicloSite?.id && ciclo.fim >= new Date().toISOString().slice(0, 10) ? "Destaque do ciclo · parcial" : "Campeão do ciclo"}</span>
             <h3>${nomeBonito(p.name)}</h3>
             <p class="champion-area">${p.category || ""}</p>
             <div class="champion-score"><strong>${fmt(p.score)}</strong><small>Savacoins</small></div>

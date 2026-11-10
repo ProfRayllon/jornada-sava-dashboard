@@ -54,8 +54,8 @@
   };
 
   const tipos = {
-    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros cadastrados (até 2.300 Savacoins no ano).", cor: "#9d2824", icone: ico("felicidade") },
-    evento: { nome: "Evento institucional", desc: "Participação nos eventos cadastrados (até 700 Savacoins no ano).", cor: "#3a3c39", icone: ico("evento") },
+    felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros cadastrados (até 2.300 Savacoins por ciclo).", cor: "#9d2824", icone: ico("felicidade") },
+    evento: { nome: "Evento institucional", desc: "Participação nos eventos cadastrados (até 700 Savacoins por ciclo).", cor: "#3a3c39", icone: ico("evento") },
     avaliacao: { nome: "Avaliação do coordenador", desc: "Por ciclo de avaliação: técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
     indicacao: { nome: "Indicação de negócio", desc: "Bônus de 500 Savacoins, exclusivo dos advogados.", cor: "#2f7a5b", icone: ico("indicacao") },
     missao: { nome: "Missão secreta", desc: "Missões cadastradas e divulgadas pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
@@ -80,19 +80,19 @@
   const views = {
     visao: { nome: "Visão geral", kicker: "Acompanhamento da Jornada", render: renderVisao },
     painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel },
-    apresentacao: { nome: "Apresentação", kicker: "Resultado do ano", render: (el) => window.SAVA_APRESENTACAO.render(el, { ano: state.ano }) },
+    apresentacao: { nome: "Apresentação", kicker: "Resultado do ciclo", render: (el) => window.SAVA_APRESENTACAO.render(el, { ciclo: state.ciclo }) },
     lancamentos: { nome: "Lançamentos", kicker: "Eventos, pontuação e histórico", render: renderLancamentos },
     pessoas: { nome: "Colaboradores", kicker: "Pessoas avaliadas", render: renderPessoas, perfis: ["admin", "rh"] },
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, ev: { tipo: "all" }, lanc: { aba: "eventos", aberto: null } };
+  const state = { usuario: null, ciclo: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, hist: { tipo: "all", busca: "", todosCiclos: true }, ev: { tipo: "all" }, lanc: { aba: "eventos", aberto: null } };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
     state.usuario = S.usuarioAtual();
     if (!state.usuario) return location.replace("login.html");
-    state.ano = S.anoVigente();
+    state.ciclo = S.cicloVigente()?.id || null;
 
     let hash = location.hash.slice(1);
     if (hash === "historico") state.lanc.aba = "historico";
@@ -106,7 +106,7 @@
     S.ouvir(() => {
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
-      if (!S.anosDisponiveis().includes(state.ano)) state.ano = S.anoVigente();
+      if (!S.cicloPorId(state.ciclo)) state.ciclo = S.cicloVigente()?.id || null;
       if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(state.view === "lancamentos" && state.lanc.aberto)) render();
     });
   });
@@ -206,36 +206,45 @@
 
   // ---------------- Painel (ranking oficial, alimentado pelos lançamentos) ----------------
   function renderPainel(el) {
-    if ($("#painelFrame", el)?.dataset.ano === String(state.ano)) return;
-    el.innerHTML = `<iframe id="painelFrame" class="painel-frame" src="painel.html?year=${state.ano}" data-ano="${state.ano}" title="Painel da Jornada SAVA"></iframe>`;
+    const chave = S.chavePainel(state.ciclo);
+    if ($("#painelFrame", el)?.dataset.ciclo === String(chave)) return;
+    el.innerHTML = `<iframe id="painelFrame" class="painel-frame" src="painel.html?year=${chave}" data-ciclo="${chave}" title="Painel da Jornada SAVA"></iframe>`;
   }
 
-  // ---------------- Ano da Jornada ----------------
-  // O sistema mostra o ano mais recente com dados; o seletor permite consultar os anteriores.
-  function seletorAno(id) {
-    return `<select id="${id}" class="year-select" aria-label="Ano da Jornada">${S.anosDisponiveis()
-      .map((a) => `<option value="${a}" ${a === state.ano ? "selected" : ""}>Jornada ${a}</option>`)
+  // ---------------- Ciclo da Jornada ----------------
+  // O sistema abre no ciclo em andamento; o seletor permite consultar os outros.
+  const cicloAtual = () => S.cicloPorId(state.ciclo);
+  const periodoCiclo = (c) => (c ? `${dataBr(c.inicio)} a ${dataBr(c.fim)}` : "");
+
+  function seletorCiclo(id) {
+    const lista = S.listarCiclos();
+    if (!lista.length) return "";
+    return `<select id="${id}" class="year-select" aria-label="Ciclo da Jornada">${lista
+      .map((c) => `<option value="${esc(c.id)}" ${c.id === state.ciclo ? "selected" : ""}>${esc(c.nome)}</option>`)
       .join("")}</select>`;
   }
 
-  function ligarSeletorAno(el, id, rerender) {
+  function ligarSeletorCiclo(el, id, rerender) {
     $(`#${id}`, el)?.addEventListener("change", (e) => {
-      state.ano = Number(e.target.value);
+      state.ciclo = e.target.value;
       rerender(el);
     });
   }
 
-  // Quantas avaliações a pessoa já recebeu no ano (para numerar 1ª, 2ª… avaliação).
-  function avaliacoesNoAno(pessoaId, ano) {
+  const noCiclo = (c, data) => Boolean(c && data && data >= c.inicio && data <= c.fim);
+
+  // Quantas avaliações a pessoa já recebeu no ciclo do lançamento (para numerar 1ª, 2ª… avaliação).
+  function avaliacoesNoCiclo(pessoaId, data) {
+    const c = S.cicloDaData(data);
     return S.listarLancamentos()
-      .filter((l) => l.tipo === "avaliacao" && l.pessoaId === pessoaId && l.ano === ano)
+      .filter((l) => l.tipo === "avaliacao" && l.pessoaId === pessoaId && (c ? noCiclo(c, l.data) : l.data === data))
       .sort((a, b) => a.data.localeCompare(b.data) || a.criadoEm.localeCompare(b.criadoEm));
   }
 
-  // Soma do que cada pessoa já recebeu no ano num tipo de lançamento coletivo.
-  function somaNoAno(tipo, pessoaId, ano) {
+  // Soma do que cada pessoa já recebeu no ciclo num tipo de lançamento coletivo.
+  function somaNoCiclo(tipo, pessoaId, ciclo) {
     return S.listarLancamentos()
-      .filter((l) => l.tipo === tipo && l.ano === ano && l.pessoaIds?.includes(pessoaId))
+      .filter((l) => l.tipo === tipo && noCiclo(ciclo, l.data) && l.pessoaIds?.includes(pessoaId))
       .reduce((t, l) => t + Number(l.pontos || 0), 0);
   }
 
@@ -243,9 +252,10 @@
   // Em camadas: indicadores → ranking (página inteira, com rolagem) → distribuição por nível
   // com o total de pessoas sem avaliação ao lado.
   function renderVisao(el) {
-    const ano = state.ano;
-    const linhas = S.calcularAno(ano);
-    const lancs = S.listarLancamentos().filter((l) => l.ano === ano);
+    const ciclo = cicloAtual();
+    if (!ciclo) return semCiclos(el);
+    const linhas = S.calcularCiclo(ciclo.id);
+    const lancs = S.lancamentosDoCiclo(ciclo.id);
     const avaliacoes = lancs.filter((l) => l.tipo === "avaliacao");
     const avaliados = new Set(avaliacoes.map((l) => l.pessoaId));
     // Avaliações que vieram das planilhas (ex.: 2025 e 1º semestre de 2026) também contam.
@@ -273,16 +283,17 @@
     el.innerHTML = `
       <section class="kpis">
         ${kpi("Colaboradores na jornada", fmt(linhas.length), `${linhas.filter((l) => l.pessoa.categoria === "adv").length} ADV · ${linhas.filter((l) => l.pessoa.categoria === "adm").length} ADM`)}
-        ${kpi(`Savacoins em ${ano}`, fmt(totalCoins), `${fmt(lancs.length)} lançamentos no sistema`)}
-        ${kpi(`Avaliações em ${ano}`, fmt(avaliacoes.length), `${fmt(avaliados.size)} pessoa(s) avaliada(s)`)}
-        ${kpi("Cobertura de avaliações", `${cobertura}%`, `${pendentes.length} sem avaliação em ${ano}`, cobertura)}
+        ${kpi("Savacoins no ciclo", fmt(totalCoins), `${fmt(lancs.length)} lançamentos no sistema`)}
+        ${kpi("Avaliações no ciclo", fmt(avaliacoes.length), `${fmt(avaliados.size)} pessoa(s) avaliada(s)`)}
+        ${kpi("Cobertura de avaliações", `${cobertura}%`, `${pendentes.length} sem avaliação no ciclo`, cobertura)}
       </section>
 
       <section class="card" id="rankingCard">
         <div class="card-head">
-          <div><h2>Ranking ao vivo · ${ano}</h2><p class="muted">${S.temBase(ano) ? "Base das planilhas + lançamentos do sistema" : "Lançamentos feitos no sistema"}. Clique numa pessoa para ver o progresso.</p>${statusPublicacao(ano)}</div>
+          <div><h2>Ranking ao vivo · ${esc(ciclo.nome)}</h2><p class="muted">${periodoCiclo(ciclo)} · ${S.temBase(ciclo.id) ? "Base das planilhas + lançamentos do sistema" : "Lançamentos feitos no sistema"}. Clique numa pessoa para ver o progresso.</p>${statusPublicacao(ciclo)}</div>
           <div class="filters">
-            ${seletorAno("fAno")}
+            ${seletorCiclo("fAno")}
+            ${state.usuario.perfil === "admin" ? `<button type="button" class="btn btn-ghost" id="gerirCiclos">${ico("eventos")} Ciclos</button>` : ""}
             <input type="search" id="fBusca" placeholder="Buscar pessoa" value="${esc(f.busca)}" />
             <select id="fArea" aria-label="Área">
               <option value="all">Todas as áreas</option>
@@ -343,9 +354,9 @@
         </div>
 
         <div class="card pend-card">
-          <span class="pend-kicker">Sem avaliação em ${ano}</span>
+          <span class="pend-kicker">Sem avaliação no ciclo</span>
           <strong class="pend-num">${fmt(pendentes.length)}</strong>
-          <p class="muted small">${pendentes.length ? `de ${fmt(avaliaveis.length)} colaboradores ainda não receberam nenhuma avaliação no ano.` : "Todos os colaboradores já têm avaliação no ano ✓"}</p>
+          <p class="muted small">${pendentes.length ? `de ${fmt(avaliaveis.length)} colaboradores ainda não receberam nenhuma avaliação no ciclo.` : "Todos os colaboradores já têm avaliação no ciclo ✓"}</p>
           <div class="pend-split">
             <span><b>${fmt(pendentes.filter((l) => l.pessoa.categoria === "adm").length)}</b> ADM</span>
             <span><b>${fmt(pendentes.filter((l) => l.pessoa.categoria === "adv").length)}</b> ADV</span>
@@ -372,8 +383,9 @@
       f.nivel = e.target.value;
       renderVisao(el);
     });
-    ligarSeletorAno(el, "fAno", renderVisao);
-    $("#pubAno", el)?.addEventListener("click", () => alternarPublicacao(ano));
+    ligarSeletorCiclo(el, "fAno", renderVisao);
+    $("#pubAno", el)?.addEventListener("click", () => alternarPublicacao(ciclo));
+    $("#gerirCiclos", el)?.addEventListener("click", abrirCiclos);
     $$("[data-foto-vencedor]", el).forEach((input) => {
       // O clique na foto não deve abrir a ficha da pessoa (a linha inteira é clicável).
       input.closest(".foto-venc").addEventListener("click", (e) => e.stopPropagation());
@@ -435,42 +447,154 @@
     if (r.ok) renderVisao(el);
   }
 
-  // Publicação no site: o ranking, os números e o vencedor de um ano só aparecem na página
-  // inicial depois que o administrador publica aquele ano.
-  function statusPublicacao(ano) {
-    const publicado = S.anosPublicados().includes(ano);
+  // Publicação no site: o ranking, os números e o vencedor de um ciclo só aparecem na página
+  // inicial depois que o administrador publica aquele ciclo.
+  function statusPublicacao(ciclo) {
+    const publicado = ciclo.publicado;
     const admin = state.usuario.perfil === "admin";
     return `<div class="pub-status ${publicado ? "on" : ""}">
       <span class="pub-dot" aria-hidden="true"></span>
-      <span>${publicado ? `Jornada ${ano} <b>publicada</b> no site` : `Jornada ${ano} <b>oculta</b> no site`}</span>
+      <span>${esc(ciclo.nome)} ${publicado ? "<b>publicado</b> no site" : "<b>oculto</b> no site"}</span>
       ${admin ? `<button type="button" class="btn btn-sm ${publicado ? "btn-ghost" : "btn-gold"}" id="pubAno">${publicado ? "Despublicar" : "Publicar no site"}</button>` : ""}
     </div>`;
   }
 
-  async function alternarPublicacao(ano) {
-    const publicar = !S.anosPublicados().includes(ano);
+  async function alternarPublicacao(ciclo) {
+    const publicar = !ciclo.publicado;
+    const nome = esc(ciclo.nome);
     const sim = await confirmar(
       publicar
         ? {
-            titulo: `Publicar a Jornada ${ano}?`,
-            mensagem: `O ranking, os números e o <b>destaque do ano</b> de ${ano} vão aparecer na página inicial do site.`,
+            titulo: `Publicar “${nome}”?`,
+            mensagem: `O ranking, os números e o <b>destaque</b> de ${nome} vão aparecer na página inicial do site.`,
             detalhe: "Os pontos continuam sendo atualizados no site a cada novo lançamento. Você pode despublicar quando quiser.",
             acao: "Publicar",
           }
         : {
-            titulo: `Despublicar a Jornada ${ano}?`,
-            mensagem: `A Jornada ${ano} deixa de aparecer na página inicial do site.`,
+            titulo: `Despublicar “${nome}”?`,
+            mensagem: `${nome} deixa de aparecer na página inicial do site.`,
             detalhe: "Nada é apagado: os dados continuam no sistema e no painel interno.",
             acao: "Despublicar",
           },
     );
     if (!sim) return;
-    const r = await executar(() => S.publicarAno(ano, publicar), {
+    const r = await executar(() => S.publicarCiclo(ciclo.id, publicar), {
       carregando: publicar ? "Publicando no site…" : "Despublicando…",
-      concluido: publicar ? `Jornada ${ano} publicada` : `Jornada ${ano} oculta no site`,
+      concluido: publicar ? `${nome} publicado` : `${nome} oculto no site`,
       detalhe: publicar ? "Já aparece na página inicial." : "Não aparece mais na página inicial.",
     });
     if (r.ok) render();
+  }
+
+  // ---------------- Cadastro de ciclos (administrador) ----------------
+  // Tela inicial quando ainda não existe nenhum ciclo.
+  function semCiclos(el) {
+    const admin = state.usuario.perfil === "admin";
+    el.innerHTML = `<div class="card empty-state">
+      <strong>Nenhum ciclo cadastrado.</strong>
+      <p class="muted small">Os ciclos definem o período de cada painel (ex.: 1º semestre de 2027, de janeiro a julho). Tudo o que for lançado dentro do período entra no ciclo.</p>
+      ${admin ? `<button type="button" class="btn btn-gold" id="novoCicloVazio">+ Cadastrar ciclo</button>` : `<p class="muted small">Peça ao administrador para cadastrar o ciclo.</p>`}
+    </div>`;
+    $("#novoCicloVazio", el)?.addEventListener("click", () => formCiclo());
+  }
+
+  function abrirCiclos() {
+    const lista = S.listarCiclos();
+    abrirModal(
+      "Ciclos da Jornada",
+      `<p class="muted small">Cada ciclo é um painel: ranking, apresentação e site mostram só o que foi lançado entre o início e o fim. Os níveis continuam acumulando de um ciclo para o outro; os tetos valem por ciclo.</p>
+      <div class="ciclos-lista">
+        ${lista
+          .map((c) => {
+            const n = S.lancamentosDoCiclo(c.id).length;
+            return `<div class="ciclo-item ${c.id === state.ciclo ? "atual" : ""}">
+              <div class="ciclo-info">
+                <b>${esc(c.nome)}</b>
+                <small>${periodoCiclo(c)} · ${fmt(n)} lançamento(s)${c.anoBase ? " · base das planilhas" : ""}</small>
+                <small>Tetos: Felicidade ${fmt(c.tetoFelicidade)} · Eventos ${fmt(c.tetoEventos)}</small>
+              </div>
+              <span class="status ${c.publicado ? "on" : ""}">${c.publicado ? "No site" : "Oculto"}</span>
+              <div class="row-actions">
+                ${btnEditar("data-ciclo-editar", c.id)}
+                ${c.anoBase || n ? "" : btnExcluir("data-ciclo-excluir", c.id)}
+              </div>
+            </div>`;
+          })
+          .join("") || `<p class="muted">Nenhum ciclo cadastrado ainda.</p>`}
+      </div>
+      <div class="form-actions"><button class="btn btn-ghost" type="button" data-close>Fechar</button><button class="btn btn-gold" type="button" id="novoCiclo">+ Novo ciclo</button></div>`,
+    );
+    $("#novoCiclo").addEventListener("click", () => formCiclo());
+    $$("[data-ciclo-editar]").forEach((b) => b.addEventListener("click", () => formCiclo(S.cicloPorId(b.dataset.cicloEditar))));
+    $$("[data-ciclo-excluir]").forEach((b) =>
+      b.addEventListener("click", async () => {
+        const c = S.cicloPorId(b.dataset.cicloExcluir);
+        const sim = await confirmar({ titulo: "Excluir ciclo?", mensagem: `<b>${esc(c.nome)}</b> · ${periodoCiclo(c)}`, acao: "Excluir", perigo: true });
+        if (!sim) return abrirCiclos();
+        const r = await executar(() => S.excluirCiclo(c.id), { carregando: "Excluindo ciclo…", concluido: "Ciclo excluído" });
+        if (r.ok && state.ciclo === c.id) state.ciclo = S.cicloVigente()?.id || null;
+        abrirCiclos();
+        render();
+      }),
+    );
+  }
+
+  // Sugestão para um ciclo novo: o semestre seguinte ao último cadastrado.
+  function proximoSemestre() {
+    const ultimo = S.listarCiclos()[0];
+    const ref = ultimo ? new Date(`${ultimo.fim}T12:00:00`) : new Date();
+    if (ultimo) ref.setDate(ref.getDate() + 1);
+    const ano = ref.getFullYear();
+    const primeiro = ref.getMonth() < 6;
+    return {
+      nome: `${primeiro ? "1º" : "2º"} semestre de ${ano}`,
+      inicio: ultimo ? ref.toISOString().slice(0, 10) : `${ano}-${primeiro ? "01-01" : "07-01"}`,
+      fim: `${ano}-${primeiro ? "06-30" : "12-31"}`,
+    };
+  }
+
+  function formCiclo(c = null) {
+    const sug = c ? null : proximoSemestre();
+    const travado = Boolean(c?.anoBase);
+    abrirModal(
+      c ? "Editar ciclo" : "Novo ciclo",
+      `<form class="form-grid" id="cicloForm" novalidate>
+        <label class="field field-full"><span>Nome do ciclo</span><input name="nome" required value="${esc(c?.nome || sug.nome)}" placeholder="Ex.: 1º semestre de 2027" /></label>
+        <label class="field"><span>Início</span><input type="date" name="inicio" required value="${c?.inicio || sug.inicio}" ${travado ? "disabled" : ""} /></label>
+        <label class="field"><span>Fim</span><input type="date" name="fim" required value="${c?.fim || sug.fim}" ${travado ? "disabled" : ""} /></label>
+        ${travado ? `<p class="muted small field-full">As datas deste ciclo vêm da base das planilhas (ano inteiro) e não podem mudar.</p>` : ""}
+        <label class="field"><span>Teto do Programa de Felicidade</span><input type="number" name="tetoFelicidade" min="0" step="25" value="${c?.tetoFelicidade ?? R.maxFelicidadeAno}" /><small class="field-hint">Savacoins por pessoa no ciclo. Quem atinge ganha o selo “Sou feliz!”.</small></label>
+        <label class="field"><span>Teto de Eventos institucionais</span><input type="number" name="tetoEventos" min="0" step="25" value="${c?.tetoEventos ?? R.maxEventosAno}" /><small class="field-hint">Savacoins por pessoa no ciclo.</small></label>
+        <p class="form-error field-full" id="cicloErro"></p>
+        <div class="form-actions field-full"><button class="btn btn-ghost" type="button" id="cicloVoltar">Voltar</button><button class="btn btn-gold" type="submit">Salvar ciclo</button></div>
+      </form>`,
+    );
+    const form = $("#cicloForm");
+    const campo = (n) => form.elements.namedItem(n);
+    $("#cicloVoltar").addEventListener("click", abrirCiclos);
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const dados = {
+        id: c?.id,
+        nome: campo("nome").value.trim(),
+        inicio: campo("inicio").value,
+        fim: campo("fim").value,
+        tetoFelicidade: Number(campo("tetoFelicidade").value),
+        tetoEventos: Number(campo("tetoEventos").value),
+      };
+      if (!dados.nome) return ($("#cicloErro").textContent = "Dê um nome ao ciclo.");
+      if (!travado && (!dados.inicio || !dados.fim)) return ($("#cicloErro").textContent = "Informe o início e o fim.");
+      if (!travado && dados.fim < dados.inicio) return ($("#cicloErro").textContent = "O fim precisa ser depois do início.");
+      const r = await executar(() => S.salvarCiclo(dados), {
+        carregando: "Salvando ciclo…",
+        concluido: c ? "Ciclo atualizado" : "Ciclo cadastrado",
+        detalhe: (salvo) => `<b>${esc(salvo.nome)}</b><br>${periodoCiclo(salvo)}`,
+      });
+      if (!r.ok) return ($("#cicloErro").textContent = r.erro.message);
+      if (!c) state.ciclo = r.resultado.id;
+      abrirCiclos();
+      render();
+    });
   }
 
   function kpi(rotulo, valor, sub, progresso) {
@@ -505,7 +629,7 @@
 
   // ---------------- Ficha da pessoa ----------------
   function abrirPessoa(id) {
-    const linhas = S.calcularAno(state.ano);
+    const linhas = S.calcularCiclo(state.ciclo);
     const l = linhas.find((x) => x.pessoa.id === id);
     if (!l) return;
     const pos = linhas.indexOf(l) + 1;
@@ -524,7 +648,7 @@
       </header>
       <section class="drawer-stats">
         <div><span>Posição</span><strong>${pos}º</strong></div>
-        <div><span>Savacoins ${state.ano}</span><strong>${fmt(l.score)}</strong></div>
+        <div><span>Savacoins no ciclo</span><strong>${fmt(l.score)}</strong></div>
         <div><span>Total acumulado</span><strong>${fmt(l.levelScore)}</strong></div>
       </section>
       <section class="drawer-sec">
@@ -534,14 +658,14 @@
         </div>
       </section>
       <section class="drawer-sec">
-        <h3>Composição da pontuação no ano</h3>
+        <h3>Composição da pontuação no ciclo</h3>
         ${pilares
           .map(
             (p) => `<div class="pillar"><header><span><i style="background:${p.cor}"></i>${p.nome}</span><b>${fmt(v[p.id])}</b></header>
             <div class="lv-track"><i style="width:${l.score ? (v[p.id] / l.score) * 100 : 0}%;background:${p.cor}"></i></div></div>`,
           )
           .join("")}
-        <p class="muted small">${S.temBase(state.ano) ? "Inclui a base importada das planilhas e os lançamentos do sistema." : `Pontos lançados no sistema em ${state.ano}. O total acumulado soma os anos anteriores.`}</p>
+        <p class="muted small">${S.temBase(state.ciclo) ? "Inclui a base importada das planilhas e os lançamentos do sistema." : `Pontos lançados no sistema em ${esc(cicloAtual()?.nome || "")}. O total acumulado soma os ciclos anteriores.`}</p>
       </section>
       <section class="drawer-sec">
         <h3>Selos conquistados</h3>
@@ -630,7 +754,7 @@
     const dados = evento
       ? [
           ["Data", dataBr(evento.data)],
-          ["Jornada", evento.ano],
+          ["Ciclo", esc(S.cicloDaData(evento.data)?.nome || "Fora de ciclo")],
           tipo === "avaliacao" ? ["Pontuação", "Questionário"] : ["Savacoins por pessoa", fmt(evento.pontos)],
           [tipo === "avaliacao" ? "Avaliados" : "Pontuados", fmt(n)],
         ]
@@ -657,45 +781,41 @@
       .sort((a, b) => a.nome.localeCompare(b.nome));
   }
 
-  // Anos em que se pode lançar: os que já têm dados e o próximo (para abrir a Jornada seguinte).
-  function anosParaLancar() {
-    const proximo = Number(hojeIso().slice(0, 4)) + 1;
-    return [...new Set([proximo, ...S.anosDisponiveis()])].filter((a) => a >= 2025 && a <= proximo).sort((a, b) => b - a);
-  }
-
-  // Data sugerida dentro do ano escolhido: hoje, se for o ano corrente; senão o início ou o fim do ano.
-  function dataPadrao(ano) {
+  // Data sugerida dentro do ciclo: hoje, se estiver nele; senão o início (ciclo futuro) ou o fim (passado).
+  function dataPadrao(ciclo) {
     const hoje = hojeIso();
-    const anoHoje = Number(hoje.slice(0, 4));
-    return ano === anoHoje ? hoje : ano > anoHoje ? `${ano}-01-01` : `${ano}-12-31`;
+    if (!ciclo || noCiclo(ciclo, hoje)) return hoje;
+    return hoje < ciclo.inicio ? ciclo.inicio : ciclo.fim;
   }
 
   function campoData() {
-    const ano = anosParaLancar().includes(state.ano) ? state.ano : anosParaLancar()[0];
+    const lista = S.listarCiclos();
+    const atual = cicloAtual() || lista[0];
     return `
-      <label class="field"><span>Jornada (ano)</span><select name="anoJornada" class="year-pick">${anosParaLancar()
-        .map((a) => `<option value="${a}" ${a === ano ? "selected" : ""}>Jornada ${a}</option>`)
+      <label class="field"><span>Ciclo</span><select name="cicloLanc" class="year-pick">${lista
+        .map((c) => `<option value="${esc(c.id)}" ${c.id === atual?.id ? "selected" : ""}>${esc(c.nome)}</option>`)
         .join("")}</select></label>
-      <label class="field"><span>Data</span><input type="date" name="data" required value="${dataPadrao(ano)}" min="${ano}-01-01" max="${ano}-12-31" /><small class="field-hint" id="dataInfo"></small></label>`;
+      <label class="field"><span>Data</span><input type="date" name="data" required value="${dataPadrao(atual)}" min="${atual?.inicio || ""}" max="${atual?.fim || ""}" /><small class="field-hint" id="dataInfo"></small></label>`;
   }
 
-  // Mostra em que ano da Jornada a pontuação vai entrar.
+  // Mostra em que ciclo a pontuação vai entrar.
   function ligarData(form) {
     const input = $('input[name="data"]', form);
     const info = $("#dataInfo", form);
-    const anoSel = $('select[name="anoJornada"]', form);
-    if (!input || !info || !anoSel) return;
+    const sel = $('select[name="cicloLanc"]', form);
+    if (!input || !info || !sel) return;
     const atualizar = () => {
-      const fora = input.value && input.value.slice(0, 4) !== anoSel.value;
+      const c = S.cicloPorId(sel.value);
+      const fora = input.value && !noCiclo(c, input.value);
       info.classList.toggle("warn", Boolean(fora));
-      info.textContent = !input.value ? "" : fora ? `A data precisa ser de ${anoSel.value}.` : `Entra na Jornada ${anoSel.value}`;
+      info.textContent = !input.value ? "" : fora ? `A data precisa estar entre ${periodoCiclo(c)}.` : `Entra no ciclo ${c.nome}`;
     };
-    anoSel.addEventListener("change", () => {
-      const ano = Number(anoSel.value);
-      state.ano = ano;
-      input.min = `${ano}-01-01`;
-      input.max = `${ano}-12-31`;
-      input.value = dataPadrao(ano);
+    sel.addEventListener("change", () => {
+      const c = S.cicloPorId(sel.value);
+      state.ciclo = c.id;
+      input.min = c.inicio;
+      input.max = c.fim;
+      input.value = dataPadrao(c);
       atualizar();
     });
     input.addEventListener("input", atualizar);
@@ -720,7 +840,7 @@
   }
 
   function renderEventos(el) {
-    const ano = state.ano;
+    const ciclo = cicloAtual();
     const f = state.ev;
     const gerencia = podeCadastrarEventos();
     const permitidos = perfis[state.usuario.perfil].tipos;
@@ -728,15 +848,15 @@
     const avulsos = permitidos.filter((t) => !TIPOS_COM_EVENTO.includes(t));
     if (f.tipo !== "all" && !tiposVisiveis.includes(f.tipo)) f.tipo = "all";
     const lista = S.listarAtividades()
-      .filter((a) => a.ano === ano && tiposVisiveis.includes(a.tipo) && (f.tipo === "all" || a.tipo === f.tipo))
+      .filter((a) => noCiclo(ciclo, a.data) && tiposVisiveis.includes(a.tipo) && (f.tipo === "all" || a.tipo === f.tipo))
       .sort((a, b) => a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo));
 
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>Eventos da Jornada ${ano}</h2><p class="muted">${gerencia ? "Cadastre encontros, eventos, missões e ciclos de avaliação. Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
+          <div><h2>Eventos · ${esc(ciclo?.nome || "sem ciclo")}</h2><p class="muted">${gerencia ? "Cadastre encontros, eventos, missões e ciclos de avaliação. Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
           <div class="filters">
-            ${seletorAno("eAno")}
+            ${seletorCiclo("eAno")}
             ${tiposVisiveis.length > 1 ? `<select id="eTipo" aria-label="Tipo de evento"><option value="all">Todos os tipos</option>${tiposVisiveis
               .map((id) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${tiposAtividade[id].nome}</option>`)
               .join("")}</select>` : ""}
@@ -764,13 +884,13 @@
                     </div></td>
                   </tr>`;
                 })
-                .join("") || `<tr><td colspan="5" class="empty">Nenhum evento em ${ano}.${gerencia ? " Clique em “+ Novo evento”." : ""}</td></tr>`}
+                .join("") || `<tr><td colspan="5" class="empty">Nenhum evento neste ciclo.${gerencia ? " Clique em “+ Novo evento”." : ""}</td></tr>`}
             </tbody>
           </table>
         </div>
       </div>`;
 
-    ligarSeletorAno(el, "eAno", renderEventos);
+    ligarSeletorCiclo(el, "eAno", renderEventos);
     $("#eTipo", el)?.addEventListener("change", (e) => {
       f.tipo = e.target.value;
       renderEventos(el);
@@ -811,7 +931,7 @@
           .map(([id, t]) => `<option value="${id}" ${tipoInicial === id ? "selected" : ""}>${t.nome}</option>`)
           .join("")}</select></label>
         <label class="field field-full"><span>Nome</span><input name="titulo" required value="${esc(a.titulo || "")}" placeholder="Ex.: Café da felicidade de março" /></label>
-        <label class="field"><span>Data</span><input type="date" name="data" required value="${a.data || dataPadrao(state.ano)}" /><small class="field-hint" id="atvAno"></small></label>
+        <label class="field"><span>Data</span><input type="date" name="data" required value="${a.data || dataPadrao(cicloAtual())}" /><small class="field-hint" id="atvAno"></small></label>
         <label class="field" id="atvPontos"><span>Savacoins por pessoa</span><input type="number" name="pontos" min="1" step="25" value="${a.pontos ?? tiposAtividade[tipoInicial].pontos ?? ""}" /></label>
         <label class="field field-full"><span>Descrição (opcional)</span><input name="descricao" value="${esc(a.descricao || "")}" placeholder="Ex.: local, tema ou regra da missão" /></label>
         <p class="form-error field-full" id="atvErro"></p>
@@ -823,7 +943,9 @@
     const sincronizar = () => {
       $("#atvPontos").hidden = campo("tipo").value === "avaliacao";
       const d = campo("data").value;
-      $("#atvAno").textContent = d ? `Entra na Jornada ${d.slice(0, 4)}` : "";
+      const c = d && S.cicloDaData(d);
+      $("#atvAno").classList.toggle("warn", Boolean(d && !c));
+      $("#atvAno").textContent = !d ? "" : c ? `Entra no ciclo ${c.nome}` : "Esta data não está em nenhum ciclo.";
     };
     campo("tipo").addEventListener("change", () => {
       if (!a.id) campo("pontos").value = tiposAtividade[campo("tipo").value].pontos ?? "";
@@ -844,10 +966,10 @@
       const r = await executar(() => S.salvarAtividade({ id: a.id, tipo, titulo, data, pontos, descricao: campo("descricao").value }), {
         carregando: a.id ? "Salvando evento…" : "Cadastrando evento…",
         concluido: a.id ? "Evento atualizado" : "Evento cadastrado",
-        detalhe: (salvo) => `<b>${esc(salvo.titulo)}</b><br>${dataBr(salvo.data)} · Jornada ${salvo.ano}`,
+        detalhe: (salvo) => `<b>${esc(salvo.titulo)}</b><br>${dataBr(salvo.data)} · ${esc(S.cicloDaData(salvo.data)?.nome || "")}`,
       });
       if (!r.ok) return ($("#atvErro").textContent = r.erro.message);
-      state.ano = r.resultado.ano;
+      state.ciclo = S.cicloDaData(r.resultado.data)?.id || state.ciclo;
       fecharModal();
       render();
     });
@@ -1429,18 +1551,19 @@
     const fd = new FormData(form);
     const avisos = [];
     let dados;
-    let ano;
+    let ciclo;
 
     if (TIPOS_COM_EVENTO.includes(tipo)) {
       const atv = S.listarAtividades().find((a) => a.id === fd.get("atividadeId"));
       if (!atv) return (erro.textContent = "Selecione o evento.");
-      ano = atv.ano;
+      ciclo = S.cicloDaData(atv.data);
+      if (!ciclo) return (erro.textContent = "A data deste evento não está em nenhum ciclo. Ajuste a data do evento ou cadastre o ciclo.");
       dados = { tipo, atividadeId: atv.id };
     } else {
       const data = fd.get("data");
       if (!data) return (erro.textContent = "Informe a data.");
-      ano = Number(data.slice(0, 4));
-      if (String(ano) !== fd.get("anoJornada")) return (erro.textContent = `A data precisa ser de ${fd.get("anoJornada")}, o ano da Jornada escolhido.`);
+      ciclo = S.cicloPorId(fd.get("cicloLanc"));
+      if (!noCiclo(ciclo, data)) return (erro.textContent = `A data precisa estar dentro do ciclo escolhido (${periodoCiclo(ciclo)}).`);
       dados = { tipo, data, titulo: "" };
     }
 
@@ -1454,10 +1577,10 @@
       dados.pessoas = pessoas;
       qtd = pessoas.length;
 
-      const limite = tipo === "felicidade" ? R.maxFelicidadeAno : tipo === "evento" ? R.maxEventosAno : null;
+      const limite = tipo === "felicidade" ? ciclo.tetoFelicidade : tipo === "evento" ? ciclo.tetoEventos : null;
       if (limite) {
-        const acima = pessoas.filter((p) => somaNoAno(tipo, p.id, ano) + p.pontos > limite);
-        if (acima.length) avisos.push(`${acima.length} pessoa(s) passariam do teto de ${fmt(limite)} Savacoins de ${tipos[tipo].nome.toLowerCase()} em ${ano}.`);
+        const acima = pessoas.filter((p) => somaNoCiclo(tipo, p.id, ciclo) + p.pontos > limite);
+        if (acima.length) avisos.push(`${acima.length} pessoa(s) passariam do teto de ${fmt(limite)} Savacoins de ${tipos[tipo].nome.toLowerCase()} no ciclo ${ciclo.nome}.`);
       }
     } else {
       dados.pessoaId = fd.get("pessoaId");
@@ -1480,18 +1603,18 @@
       }
     }
 
-    if (avisos.length && !(await confirmar({ titulo: "Atenção ao teto anual", mensagem: avisos.map(esc).join("<br>"), acao: "Registrar mesmo assim" }))) return;
+    if (avisos.length && !(await confirmar({ titulo: "Atenção ao teto do ciclo", mensagem: avisos.map(esc).join("<br>"), acao: "Registrar mesmo assim" }))) return;
 
     const nomePessoa = dados.pessoaId ? nomeBonito(S.listarPessoas().find((p) => p.id === dados.pessoaId)?.nome || "") : "";
     const evento = dados.atividadeId ? S.listarAtividades().find((a) => a.id === dados.atividadeId) : null;
     const r = await executar(() => S.registrarLancamento(dados), {
       carregando: "Registrando lançamento…",
       concluido: "Lançamento concluído",
-      detalhe: `${tipos[tipo].nome}${evento ? ` · ${esc(evento.titulo)}` : ""}<br><b>${qtd > 1 ? `${qtd} pessoas pontuadas` : esc(nomePessoa) || "Registrado"}</b> na Jornada ${ano}`,
+      detalhe: `${tipos[tipo].nome}${evento ? ` · ${esc(evento.titulo)}` : ""}<br><b>${qtd > 1 ? `${qtd} pessoas pontuadas` : esc(nomePessoa) || "Registrado"}</b> no ciclo ${esc(ciclo.nome)}`,
     });
     if (!r.ok) return (erro.textContent = r.erro.message);
     state.pessoaPreSelecionada = null;
-    state.ano = ano;
+    state.ciclo = ciclo.id;
     render();
   }
 
@@ -1502,7 +1625,7 @@
     const doEvento = opcoes.atividadeId || null;
     const pessoas = new Map(S.listarPessoas().map((p) => [p.id, p]));
     const todos = S.listarLancamentos()
-      .filter((l) => (doEvento ? l.atividadeId === doEvento : state.hist.todosAnos || l.ano === state.ano))
+      .filter((l) => (doEvento ? l.atividadeId === doEvento : state.hist.todosCiclos || noCiclo(cicloAtual(), l.data)))
       .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
     const f = state.hist;
     const lista = todos.filter((l) => {
@@ -1519,10 +1642,10 @@
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>${doEvento ? `Já lançados neste evento · ${fmt(lista.length)}` : `${fmt(lista.length)} lançamento(s)`}</h2><p class="muted">${doEvento ? "Para corrigir um lançamento, exclua e registre de novo." : `Registros gravados no sistema ${state.hist.todosAnos ? "em todos os anos" : `em ${state.ano}`}.`}</p></div>
+          <div><h2>${doEvento ? `Já lançados neste evento · ${fmt(lista.length)}` : `${fmt(lista.length)} lançamento(s)`}</h2><p class="muted">${doEvento ? "Para corrigir um lançamento, exclua e registre de novo." : `Registros gravados no sistema ${state.hist.todosCiclos ? "em todos os ciclos" : `em ${esc(cicloAtual()?.nome || "")}`}.`}</p></div>
           ${doEvento ? "" : `<div class="filters">
-            <select id="hAno" class="year-select" aria-label="Ano da Jornada"><option value="all" ${state.hist.todosAnos ? "selected" : ""}>Todos os anos</option>${S.anosDisponiveis()
-              .map((a) => `<option value="${a}" ${!state.hist.todosAnos && a === state.ano ? "selected" : ""}>Jornada ${a}</option>`)
+            <select id="hAno" class="year-select" aria-label="Ciclo"><option value="all" ${state.hist.todosCiclos ? "selected" : ""}>Todos os ciclos</option>${S.listarCiclos()
+              .map((c) => `<option value="${esc(c.id)}" ${!state.hist.todosCiclos && c.id === state.ciclo ? "selected" : ""}>${esc(c.nome)}</option>`)
               .join("")}</select>
             <input type="search" id="hBusca" placeholder="Pessoa, título ou autor" value="${esc(f.busca)}" />
             <select id="hTipo"><option value="all">Todos os tipos</option>${Object.entries(tipos).map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`).join("")}</select>
@@ -1538,7 +1661,7 @@
                   const nomes = (l.pessoaIds || [l.pessoaId]).map((id) => nomeBonito(pessoas.get(id)?.nome || "Removido"));
                   return `<tr>
                     <td>${dataBr(l.data)}</td>
-                    <td><span class="type-tag" style="--c:${tipos[l.tipo].cor}">${tipos[l.tipo].icone} ${tipos[l.tipo].nome}</span>${l.tipo === "avaliacao" ? `<small>${avaliacoesNoAno(l.pessoaId, l.ano).findIndex((x) => x.id === l.id) + 1}ª avaliação do ano</small>` : ""}${l.titulo ? `<small>${esc(l.titulo)}</small>` : ""}</td>
+                    <td><span class="type-tag" style="--c:${tipos[l.tipo].cor}">${tipos[l.tipo].icone} ${tipos[l.tipo].nome}</span>${l.tipo === "avaliacao" ? `<small>${avaliacoesNoCiclo(l.pessoaId, l.data).findIndex((x) => x.id === l.id) + 1}ª avaliação do ciclo</small>` : ""}${l.titulo ? `<small>${esc(l.titulo)}</small>` : ""}</td>
                     <td>${nomes.length > 2 ? `<span title="${esc(nomes.join(", "))}">${esc(nomes.slice(0, 2).join(", "))} +${nomes.length - 2}</span>` : esc(nomes.join(", "))}
                       ${l.feedback ? `<small class="clip">“${esc(l.feedback)}”</small>` : ""}${l.justificativa ? `<small class="clip">${esc(l.justificativa)}</small>` : ""}</td>
                     <td class="num">${l.pontos ? `${fmt(l.pontos)}${l.pessoaIds?.length > 1 ? `<small>por pessoa</small>` : ""}` : "Selo"}</td>
@@ -1555,8 +1678,8 @@
     $("#hBusca", el)?.addEventListener("change", (e) => ((f.busca = e.target.value), renderHistorico(el)));
     $("#hTipo", el)?.addEventListener("change", (e) => ((f.tipo = e.target.value), renderHistorico(el)));
     $("#hAno", el)?.addEventListener("change", (e) => {
-      state.hist.todosAnos = e.target.value === "all";
-      if (!state.hist.todosAnos) state.ano = Number(e.target.value);
+      state.hist.todosCiclos = e.target.value === "all";
+      if (!state.hist.todosCiclos) state.ciclo = e.target.value;
       renderHistorico(el);
     });
     $$("[data-excluir]", el).forEach((b) =>

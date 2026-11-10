@@ -1,4 +1,4 @@
-// Apresentação do resultado do ano (aba "Apresentação" do sistema).
+// Apresentação do resultado do ciclo (aba "Apresentação" do sistema).
 // Cenas: abertura → números → níveis → um selo por cena → destaques → suspense → vencedor.
 // Navegação por setas/espaço/clique, pontos de progresso e tela cheia.
 (function () {
@@ -21,7 +21,7 @@
   };
   const icone = (nome) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome]}</svg>`;
 
-  const st = { ano: null, cena: -1 };
+  const st = { ciclo: null, cena: -1 };
   let raiz = null;
   let teclasLigadas = false;
   let cenas = [];
@@ -48,11 +48,13 @@
       : `<span class="ap-av ${classe}">${esc(iniciais(pessoa.nome))}</span>`;
   }
 
-  // ---------- Dados do ano ----------
-  function dadosDoAno(ano) {
-    const linhas = S.calcularAno(ano);
-    const lancs = S.listarLancamentos().filter((l) => l.ano === ano);
-    const atividades = S.listarAtividades().filter((a) => a.ano === ano);
+  // ---------- Dados do ciclo ----------
+  // "ano" guarda o nome curto do ciclo ("2026" ou "1º semestre de 2027"), usado nos textos.
+  function dadosDoCiclo(id) {
+    const linhas = S.calcularCiclo(id);
+    const lancs = S.lancamentosDoCiclo(id);
+    const atividades = S.atividadesDoCiclo(id);
+    const ano = S.rotuloCiclo(S.cicloPorId(id));
     const total = linhas.reduce((t, l) => t + l.score, 0);
     const pontuados = linhas.filter((l) => l.score > 0);
     const avaliados = new Set(lancs.filter((l) => l.tipo === "avaliacao").map((l) => l.pessoaId));
@@ -84,7 +86,7 @@
     const comSelo = d.selos.filter((s) => s.pessoas.length);
     return [
       { id: "abertura", nome: "Abertura" },
-      { id: "numeros", nome: "O ano em números" },
+      { id: "numeros", nome: "O ciclo em números" },
       { id: "niveis", nome: "Níveis" },
       ...(comSelo.length ? comSelo.map((s) => ({ id: "selo", nome: `Selo ${s.nome}`, selo: s.id })) : [{ id: "selo", nome: "Selos", selo: null }]),
       { id: "destaques", nome: "Destaques" },
@@ -96,15 +98,15 @@
   // ---------- Estrutura ----------
   function render(el, ctx = {}) {
     raiz = el;
-    if (!st.ano) st.ano = ctx.ano || S.anoVigente();
+    if (!S.cicloPorId(st.ciclo)) st.ciclo = ctx.ciclo || S.cicloVigente()?.id;
     ligarTeclas();
     if (st.cena < 0) return renderInicio();
     renderPalco();
   }
 
   function renderInicio() {
-    const anos = S.anosDisponiveis();
-    const d = dadosDoAno(st.ano);
+    const ciclos = S.listarCiclos();
+    const d = dadosDoCiclo(st.ciclo);
     raiz.innerHTML = `
       <section class="apre apre-inicio">
         ${fundo()}
@@ -112,11 +114,11 @@
           <img class="apre-simbolo-sm" src="assets/logo/sava-simbolo.png" alt="" />
           <p class="apre-kicker">Apresentação do resultado</p>
           <h2>Jornada SAVA</h2>
-          <p class="apre-sub">Escolha o ano e inicie. Avance com as setas do teclado, a barra de espaço ou um clique.</p>
-          <label class="apre-ano-campo"><span>Ano</span>
-            <select id="apreAno">${anos.map((a) => `<option value="${a}" ${a === st.ano ? "selected" : ""}>Jornada ${a}</option>`).join("")}</select>
+          <p class="apre-sub">Escolha o ciclo e inicie. Avance com as setas do teclado, a barra de espaço ou um clique.</p>
+          <label class="apre-ano-campo"><span>Ciclo</span>
+            <select id="apreAno">${ciclos.map((c) => `<option value="${esc(c.id)}" ${c.id === st.ciclo ? "selected" : ""}>${esc(c.nome)}</option>`).join("")}</select>
           </label>
-          <p class="apre-resumo">${d.pontuados ? `${fmt(d.pessoas)} colaboradores · ${fmt(d.total)} Savacoins · ${fmt(d.totalSelos)} selos` : "Este ano ainda não tem pontuação."}</p>
+          <p class="apre-resumo">${d.pontuados ? `${fmt(d.pessoas)} colaboradores · ${fmt(d.total)} Savacoins · ${fmt(d.totalSelos)} selos` : "Este ciclo ainda não tem pontuação."}</p>
           <div class="apre-acoes">
             <button type="button" class="apre-btn apre-btn-ouro" id="apreIniciar">Iniciar apresentação</button>
             <button type="button" class="apre-btn" id="apreIniciarCheia">Iniciar em tela cheia</button>
@@ -125,7 +127,7 @@
         ${rodape()}
       </section>`;
     $("#apreAno", raiz).addEventListener("change", (e) => {
-      st.ano = Number(e.target.value);
+      st.ciclo = e.target.value;
       renderInicio();
     });
     $("#apreIniciar", raiz).addEventListener("click", () => irCena(0));
@@ -152,7 +154,7 @@
   }
 
   function renderPalco() {
-    const d = dadosDoAno(st.ano);
+    const d = dadosDoCiclo(st.ciclo);
     cenas = montarRoteiro(d);
     st.cena = Math.min(st.cena, cenas.length - 1);
     const cena = cenas[st.cena];
@@ -162,7 +164,7 @@
         ${fundo(intenso)}
         <header class="apre-topo">
           <span class="apre-marca-txt">JORNADA <b>SAVA</b></span>
-          <span class="apre-ano-tag">Resultado ${st.ano}</span>
+          <span class="apre-ano-tag">Resultado ${S.rotuloCiclo(S.cicloPorId(st.ciclo))}</span>
         </header>
         <div class="apre-cena" id="apreCena">${montarCena(cena, d)}</div>
         <nav class="apre-nav" aria-label="Navegação da apresentação">
@@ -172,7 +174,7 @@
           <button type="button" class="apre-nav-btn" data-nav="prox" title="Próxima (→ ou espaço)" aria-label="Próxima cena" ${st.cena === cenas.length - 1 ? "disabled" : ""}>›</button>
           <button type="button" class="apre-nav-btn" data-nav="cheia" title="Tela cheia (F)" aria-label="Tela cheia">⛶</button>
         </nav>
-        ${rodape(cena.id === "vencedor" ? `Destaque oficial ${st.ano}` : undefined)}
+        ${rodape(cena.id === "vencedor" ? `Destaque oficial ${S.rotuloCiclo(S.cicloPorId(st.ciclo))}` : undefined)}
       </section>`;
 
     $$("[data-nav]", raiz).forEach((b) =>
@@ -199,7 +201,7 @@
     if (id === "abertura") {
       return `<div class="c-abertura">
         <div class="halo"><span class="arco a1"></span><span class="arco a2"></span><img src="assets/logo/sava-simbolo.png" alt="" /></div>
-        <p class="apre-kicker">Resultado do ano</p>
+        <p class="apre-kicker">Resultado do ciclo</p>
         <h1>Jornada SAVA <span>${d.ano}</span></h1>
         <p class="apre-sub">Fortalecendo a valorização, o engajamento e o desenvolvimento dos nossos talentos.</p>
       </div>`;
@@ -217,7 +219,7 @@
       const somaAreas = d.totalAdm + d.totalAdv || 1;
       return `<div class="c-numeros">
         <p class="apre-kicker">Jornada SAVA ${d.ano} em números</p>
-        <h2 class="apre-titulo">Um ano de conquistas</h2>
+        <h2 class="apre-titulo">Um ciclo de conquistas</h2>
         <div class="ap-num-grid">
           ${blocos
             .map(
@@ -280,7 +282,7 @@
       const primeira = d.destaques.length + 1;
       return `<div class="c-destaques">
         <p class="apre-kicker">Ranking ${d.ano}</p>
-        <h2 class="apre-titulo">Os destaques do ano</h2>
+        <h2 class="apre-titulo">Os destaques do ciclo</h2>
         <div class="dest-lista">
           ${lista
             .map((l, i) => `<div class="dest" style="--i:${i}">
@@ -305,7 +307,7 @@
       return `<div class="c-suspense">
         <div class="halo grande"><span class="arco a1"></span><span class="arco a2"></span><span class="arco a3"></span><img src="assets/logo/sava-simbolo.png" alt="" /></div>
         <p class="apre-kicker">Jornada SAVA ${d.ano}</p>
-        <h2>E o grande destaque do ano é…</h2>
+        <h2>E o grande destaque do ciclo é…</h2>
         <p class="apre-sub">Avance para revelar</p>
       </div>`;
     }
@@ -349,7 +351,7 @@
   }
 
   function vazio(d) {
-    return `<div class="c-abertura"><p class="apre-kicker">Jornada SAVA ${d.ano}</p><h2 class="apre-titulo">Ainda não há pontuação neste ano</h2><p class="apre-sub">Os destaques aparecem aqui assim que houver lançamentos.</p></div>`;
+    return `<div class="c-abertura"><p class="apre-kicker">Jornada SAVA ${d.ano}</p><h2 class="apre-titulo">Ainda não há pontuação neste ciclo</h2><p class="apre-sub">Os destaques aparecem aqui assim que houver lançamentos.</p></div>`;
   }
 
   // ---------- Efeitos ----------
@@ -382,7 +384,7 @@
 
   // ---------- Navegação ----------
   function irCena(i) {
-    if (!cenas.length) cenas = montarRoteiro(dadosDoAno(st.ano));
+    if (!cenas.length) cenas = montarRoteiro(dadosDoCiclo(st.ciclo));
     st.cena = Math.max(0, Math.min(cenas.length - 1, i));
     renderPalco();
     $("#aprePalco", raiz)?.focus({ preventScroll: true });
