@@ -1185,16 +1185,16 @@
         </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Foto</th><th>Nome</th><th>Perfil</th><th>Setor / área</th><th>Origem</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Foto</th><th>Nome</th><th>Perfil</th><th>Setor / área</th><th>Coordenador</th><th>Status</th><th></th></tr></thead>
             <tbody>
               ${lista
                 .map(
                   (p) => `<tr class="${p.ativo ? "" : "inactive"}">
                   <td>${S.fotoUrl(p) ? `<img class="pessoa-foto" src="${S.fotoUrl(p)}" alt="" loading="lazy" />` : `<span class="avatar sm">${esc(iniciais(p.nome))}</span>`}</td>
                   <td><strong>${esc(nomeBonito(p.nome))}</strong></td>
-                  <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}${coordPorId.get(p.coordenadorId) ? `<small>Coord.: ${esc(coordPorId.get(p.coordenadorId).nome)}</small>` : ""}</td>
+                  <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}</td>
                   <td>${esc(p.setor || "—")}</td>
-                  <td>${p.origem === "base" ? "Planilha 2026" : "Sistema"}</td>
+                  <td>${coordPorId.get(p.coordenadorId) ? esc(coordPorId.get(p.coordenadorId).nome) : "—"}</td>
                   <td><span class="status ${p.ativo ? "on" : ""}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
                   <td><div class="row-actions">${btnEditar("data-editar", p.id)}${state.usuario.perfil === "admin" ? btnExcluir("data-excluir-pessoa", p.id) : ""}</div></td>
                 </tr>`,
@@ -1234,8 +1234,7 @@
 
   function formPessoa(p = {}) {
     const coordenadores = S.listarCoordenadores().filter((c) => c.ativo || c.id === p.coordenadorId);
-    // O campo só aparece quando já existe algum coordenador para escolher.
-    const temCoordenador = (cat) => coordenadores.length > 0 && R.categoriasPontuaveis.includes(cat);
+    const temCoordenador = (cat) => R.categoriasPontuaveis.includes(cat);
     abrirModal(
       p.id ? "Editar colaborador" : "Novo colaborador",
       `<form class="form-grid" id="pessoaForm" novalidate>
@@ -1258,10 +1257,10 @@
           ${Object.entries(R.categorias).filter(([id]) => R.categoriasPontuaveis.includes(id) || p.categoria === id).map(([id, n]) => `<option value="${id}" ${p.categoria === id ? "selected" : ""}>${n}</option>`).join("")}
         </select></label>
         <label class="field"><span>Setor / área de atuação</span><input name="setor" value="${esc(p.setor || "")}" /></label>
-        <label class="field field-full" id="campoCoord" ${temCoordenador(p.categoria) ? "" : "hidden"}><span>Coordenador (opcional)</span><select name="coordenadorId">
+        <label class="field field-full"><span>Coordenador (opcional)</span><select name="coordenadorId">
           <option value="">Sem coordenador</option>
           ${coordenadores.map((c) => `<option value="${esc(c.id)}" ${p.coordenadorId === c.id ? "selected" : ""}>${esc(c.nome)}${c.ativo ? "" : " (bloqueado)"}</option>`).join("")}
-        </select></label>
+        </select>${coordenadores.length ? "" : `<small class="muted">Nenhum coordenador cadastrado ainda. Cadastre em Equipe e acessos, com o perfil “Coordenador”.</small>`}</label>
         ${p.id ? `<label class="check-line field-full"><input type="checkbox" name="ativo" ${p.ativo ? "checked" : ""} /> Participa da jornada (ativo)</label>` : ""}
         <p class="form-error field-full" id="pfErro"></p>
         <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Salvar</button></div>
@@ -1277,9 +1276,6 @@
         .then((b) => b && !novaFoto && !tirarFoto && mostrarTamanho(`Foto atual: ${tamanhoKb(b.size)}`))
         .catch(() => {});
     }
-    $("#pessoaForm [name=categoria]").addEventListener("change", (e) => {
-      $("#campoCoord").hidden = !temCoordenador(e.target.value);
-    });
     $("#fotoArq").addEventListener("change", async (e) => {
       const arquivo = e.target.files?.[0];
       if (!arquivo) return;
