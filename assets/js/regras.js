@@ -121,14 +121,70 @@
     return { nivel: prox, faltam: prox.min - pontos, progresso: (pontos - atual.min) / (prox.min - atual.min) };
   }
 
+  // ---------- Modelo de avaliação (questionário) ----------
+  // O administrador edita áreas e perguntas no sistema. Cada área pertence a um grupo ("tecnica" ou
+  // "socio"), que define os selos Mente Brilhante e Eu inspiro pessoas. Cada pergunta tem 4 níveis
+  // de resposta com os Savacoins de cada um. O modelo padrão é o formulário 2026.
+  const rotulosNota = ["Abaixo do esperado", "Em desenvolvimento", "Atende", "Supera as expectativas"];
+  const grupos = { tecnica: "Técnico", socio: "Socioemocional" };
+
+  function modeloPadrao() {
+    const areasPadrao = {
+      adm: [
+        { id: "adm-tecnica", nome: "Qualidade e domínio técnico", grupo: "tecnica" },
+        { id: "adm-socio", nome: "Comportamento e atitudes", grupo: "socio" },
+      ],
+      adv: [
+        { id: "adv-tecnica", nome: "Competência técnico-jurídica", grupo: "tecnica" },
+        { id: "adv-socio", nome: "Postura e relacionamento", grupo: "socio" },
+      ],
+    };
+    const modelo = {};
+    Object.keys(criterios).forEach((cat) => {
+      modelo[cat] = {
+        areas: areasPadrao[cat],
+        perguntas: criterios[cat].map((c) => ({
+          id: c.id,
+          areaId: `${cat}-${c.grupo}`,
+          texto: c.nome,
+          descricao: "",
+          valores: c.opcoes.map((o) => o.valor),
+        })),
+      };
+    });
+    return modelo;
+  }
+
+  // Lista de perguntas com área e grupo já resolvidos.
+  function perguntasDoModelo(modelo, categoria) {
+    const m = modelo?.[categoria];
+    if (!m) return [];
+    const areas = new Map(m.areas.map((a) => [a.id, a]));
+    return m.perguntas
+      .filter((q) => areas.has(q.areaId))
+      .map((q) => ({ ...q, area: areas.get(q.areaId), grupo: areas.get(q.areaId).grupo, max: Math.max(...q.valores) }));
+  }
+
+  // Somas por grupo de uma avaliação. Avaliações novas trazem "respostas" (cópia das perguntas
+  // respondidas); as antigas só têm "notas" pelos critérios fixos.
+  function totaisAvaliacao(l) {
+    const itens = Array.isArray(l.respostas)
+      ? l.respostas.map((r) => ({ grupo: r.grupo, valor: Number(r.valor) || 0, max: Number(r.max) || 0 }))
+      : (criterios[l.categoria] || []).map((c) => ({ grupo: c.grupo, valor: Number(l.notas?.[c.id] || 0), max: c.max }));
+    const t = { tecnica: 0, socio: 0, maxTecnica: 0, maxSocio: 0 };
+    itens.forEach((i) => {
+      if (i.grupo === "tecnica") (t.tecnica += i.valor), (t.maxTecnica += i.max);
+      if (i.grupo === "socio") (t.socio += i.valor), (t.maxSocio += i.max);
+    });
+    return t;
+  }
+
   // Selos conquistados por uma avaliação isolada (nota máxima no grupo).
-  function selosDaAvaliacao(categoria, notas) {
-    const soma = (grupo) =>
-      criterios[categoria].filter((c) => c.grupo === grupo).reduce((t, c) => t + Number(notas[c.id] || 0), 0);
-    const max = (grupo) => criterios[categoria].filter((c) => c.grupo === grupo).reduce((t, c) => t + c.max, 0);
+  function selosDaAvaliacao(l) {
+    const t = totaisAvaliacao(l);
     const ganhos = [];
-    if (soma("tecnica") >= max("tecnica")) ganhos.push("bright");
-    if (soma("socio") >= max("socio")) ganhos.push("inspire");
+    if (t.maxTecnica > 0 && t.tecnica >= t.maxTecnica) ganhos.push("bright");
+    if (t.maxSocio > 0 && t.socio >= t.maxSocio) ganhos.push("inspire");
     return ganhos;
   }
 
@@ -152,11 +208,10 @@
       case "protagonista":
         return { ...vazio, selos: ["protagonista"] };
       case "avaliacao": {
-        const soma = (grupo) =>
-          criterios[l.categoria].filter((c) => c.grupo === grupo).reduce((t, c) => t + Number(l.notas[c.id] || 0), 0);
-        const selos = selosDaAvaliacao(l.categoria, l.notas);
-        if (l.categoria === "adv") return { ...vazio, competencias: soma("tecnica") + soma("socio"), selos };
-        return { ...vazio, tecnica: soma("tecnica"), socio: soma("socio"), selos };
+        const t = totaisAvaliacao(l);
+        const selos = selosDaAvaliacao(l);
+        if (l.categoria === "adv") return { ...vazio, competencias: t.tecnica + t.socio, selos };
+        return { ...vazio, tecnica: t.tecnica, socio: t.socio, selos };
       }
       default:
         return vazio;
@@ -175,6 +230,11 @@
     categoriasPontuaveis,
     participaDaJornada,
     criterios,
+    rotulosNota,
+    grupos,
+    modeloPadrao,
+    perguntasDoModelo,
+    totaisAvaliacao,
     pontuacaoBimestral,
     indicadores,
     niveis,

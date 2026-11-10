@@ -33,6 +33,7 @@
     protagonista: '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4L7.5 21l4.5-2.5 4.5 2.5-1.1-7.6"/>',
     lancamentos: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 15l2.3 2.3 4.7-4.6"/>',
     ver: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+    subir: '<path d="M12 19V5M6 11l6-6 6 6"/>',
     editar: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
     excluir: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   };
@@ -600,8 +601,10 @@
     window.scrollTo({ top: 0 });
   }
 
-  // Tela de um evento (ou de um lançamento avulso, ex.: indicação): formulário + o que já foi lançado nele.
+  // Tela de um evento (ou de um lançamento avulso, ex.: indicação): cabeçalho colorido do tipo,
+  // formulário (participantes ou questionário) e o que já foi lançado nele.
   function renderLancamentoAberto(el) {
+    if (state.lanc.aberto === "modelo") return renderModeloAvaliacao(el);
     const avulso = state.lanc.aberto.startsWith("avulso:") ? state.lanc.aberto.slice(7) : null;
     const evento = avulso ? null : S.listarAtividades().find((a) => a.id === state.lanc.aberto);
     const tipo = avulso || evento?.tipo;
@@ -611,11 +614,41 @@
     }
     el.innerHTML = `
       <div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para lançamentos</button></div>
+      ${cabecalhoLancamento(tipo, evento)}
       <form class="card form-card" id="lancForm" novalidate></form>
       ${evento ? `<div id="lancFeitos"></div>` : ""}`;
     $("#voltarLanc", el).addEventListener("click", () => abrirLancamento(null));
+    $("#editarModelo", el)?.addEventListener("click", () => abrirLancamento("modelo"));
     montarFormulario($("#lancForm", el), tipo, evento);
     if (evento) renderHistorico($("#lancFeitos", el), { atividadeId: evento.id });
+  }
+
+  // Faixa no topo da tela do evento, na cor e com o ícone do tipo.
+  function cabecalhoLancamento(tipo, evento) {
+    const t = tipos[tipo];
+    const n = evento ? pontuadosNaAtividade(evento.id).size : 0;
+    const dados = evento
+      ? [
+          ["Data", dataBr(evento.data)],
+          ["Jornada", evento.ano],
+          tipo === "avaliacao" ? ["Pontuação", "Questionário"] : ["Savacoins por pessoa", fmt(evento.pontos)],
+          [tipo === "avaliacao" ? "Avaliados" : "Pontuados", fmt(n)],
+        ]
+      : tipo === "indicacao"
+        ? [["Bônus", `${fmt(R.pontosIndicacao)} Savacoins`], ["Quem recebe", "Advogados"]]
+        : [];
+    const admin = state.usuario.perfil === "admin";
+    return `
+      <section class="ev-banner" style="--c:${t.cor}">
+        <span class="ev-banner-ico">${t.icone}</span>
+        <div class="ev-banner-txt">
+          <small>${evento ? tiposAtividade[tipo].nome : "Lançamento avulso"}</small>
+          <h2>${esc(evento ? evento.titulo : t.nome)}</h2>
+          <p>${esc(evento?.descricao || t.desc)}</p>
+          ${tipo === "avaliacao" && admin ? `<button type="button" class="ev-banner-link" id="editarModelo">${ico("editar")} Editar perguntas do questionário</button>` : ""}
+        </div>
+        ${dados.length ? `<dl class="ev-banner-dados">${dados.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>` : ""}
+      </section>`;
   }
 
   function pessoasAtivas(categoria) {
@@ -708,6 +741,7 @@
               .map((id) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${tiposAtividade[id].nome}</option>`)
               .join("")}</select>` : ""}
             ${avulsos.map((t) => `<button class="btn btn-ghost" data-avulso="${t}">+ ${tipos[t].nome}</button>`).join("")}
+            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="abrirModelo">${ico("avaliacao")} Modelo de avaliação</button>` : ""}
             ${gerencia ? `<button class="btn btn-gold" id="novoEvento">+ Novo evento</button>` : ""}
           </div>
         </div>
@@ -743,6 +777,7 @@
     });
     $("#novoEvento", el)?.addEventListener("click", () => formAtividade({ tipo: f.tipo !== "all" ? f.tipo : "felicidade" }));
     $$("[data-avulso]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(`avulso:${b.dataset.avulso}`)));
+    $("#abrirModelo", el)?.addEventListener("click", () => abrirLancamento("modelo"));
     $$("[data-abrir]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(b.dataset.abrir)));
     // A linha inteira também abre o evento (menos os botões de editar/excluir).
     $$("[data-abrir-linha]", el).forEach((tr) =>
@@ -818,15 +853,9 @@
     });
   }
 
-  // Evento do lançamento: fixo (escolhido pelo olho na lista). A data e o ano vêm dele.
+  // Evento do lançamento: fixo (escolhido pelo olho na lista); data, ano e nome aparecem no cabeçalho.
   function campoAtividade(atual) {
-    return {
-      atual,
-      html: `
-        <input type="hidden" name="atividadeId" value="${esc(atual.id)}" />
-        <div class="field field-wide"><span>${tiposAtividade[atual.tipo].curto}</span><div class="static-value"><b>${esc(atual.titulo)}</b></div></div>
-        <div class="field"><span>Data · Jornada</span><div class="static-value">${dataBr(atual.data)} · Jornada ${atual.ano}</div></div>`,
-    };
+    return { atual, html: `<input type="hidden" name="atividadeId" value="${esc(atual.id)}" />` };
   }
 
   // Lista de participantes com filtro por área e Savacoins por pessoa (pontuação em lote).
@@ -938,86 +967,345 @@
       corpo = `${campoData()}${campoPessoa(null)}
         <label class="field field-full"><span>Por que é protagonista?</span><textarea name="justificativa" rows="3" required placeholder="Inovação, melhoria ou inspiração que motivou a indicação"></textarea></label>`;
     } else if (tipo === "avaliacao") {
-      const pre = state.pessoaPreSelecionada && S.listarPessoas().find((p) => p.id === state.pessoaPreSelecionada);
-      const cat = form.dataset.cat || pre?.categoria || "adm";
-      form.dataset.cat = cat;
-      corpo = `
-        ${atv.html}
-        <div class="field field-full"><span>Perfil avaliado</span>
-          <div class="seg">
-            <button type="button" data-cat="adm" class="${cat === "adm" ? "active" : ""}">Controladoria e Administrativo</button>
-            <button type="button" data-cat="adv" class="${cat === "adv" ? "active" : ""}">Advogados Associados</button>
-          </div>
-        </div>
-        ${campoPessoa(cat, "Colaborador(a)", pontuadosNaAtividade(atv.atual.id))}
-        <label class="field field-wide"><span>${cat === "adv" ? "Área de atuação" : "Setor"}</span><input name="area" placeholder="${cat === "adv" ? "Ex.: Trabalhista, Energisa PB" : "Ex.: Controladoria"}" value="${esc(pre?.setor || "")}" /></label>
-        <div class="field field-full criteria">
-          ${R.criterios[cat]
-            .map(
-              (c) => `
-            <fieldset class="criterion">
-              <legend>${c.nome}<small>${c.grupo === "tecnica" ? "Técnico" : "Socioemocional"} · até ${fmt(c.max)}</small></legend>
-              <div class="options">
-                ${c.opcoes.map((o) => `<label><input type="radio" name="n_${c.id}" value="${o.valor}" required /><span><b>${fmt(o.valor)}</b>${o.rotulo}</span></label>`).join("")}
-              </div>
-            </fieldset>`,
-            )
-            .join("")}
-        </div>
-        <div class="field field-full eval-summary" id="evalSummary"></div>
-        <label class="field field-full"><span>Mensagem de feedback para o colaborador</span><textarea name="feedback" rows="3"></textarea></label>
-        <label class="field field-full"><span>Merece algum destaque especial? Descreva</span><textarea name="destaque" rows="2"></textarea></label>`;
+      corpo = `${atv.html}${questionarioAvaliacao(form, evento)}`;
     }
 
+    const titulos = {
+      felicidade: ["Quem participou?", "Marque os participantes. O valor padrão vem do evento e pode ser ajustado por pessoa."],
+      evento: ["Quem participou?", "Marque os participantes. O valor padrão vem do evento e pode ser ajustado por pessoa."],
+      missao: ["Quem cumpriu a missão?", "Marque quem cumpriu. O valor padrão vem do evento e pode ser ajustado por pessoa."],
+      avaliacao: ["Questionário de avaliação", "Escolha o colaborador e marque um nível em cada pergunta. A pontuação é somada automaticamente."],
+    };
+    const [titulo, subtitulo] = titulos[tipo] || [t.nome, t.desc];
+
     form.innerHTML = `
-      <div class="card-head"><div><h2>${t.nome}</h2><p class="muted">${t.desc}</p></div></div>
+      <div class="card-head"><div><h2>${titulo}</h2><p class="muted">${subtitulo}</p></div></div>
       <div class="form-grid">${corpo}</div>
       <p class="form-error" id="formError" role="alert"></p>
       <div class="form-actions"><button type="submit" class="btn btn-gold">${tipo === "avaliacao" ? "Registrar avaliação" : "Registrar lançamento"}</button></div>`;
 
     if ($("#checklist", form)) ligarParticipantes(form);
     ligarData(form);
-    if (tipo === "avaliacao" && atv) {
-      $$("[data-cat]", form).forEach((b) =>
-        b.addEventListener("click", () => {
-          form.dataset.cat = b.dataset.cat;
-          state.pessoaPreSelecionada = null;
-          montarFormulario(form, tipo, evento);
-        }),
-      );
-      const atualizar = () => resumoAvaliacao(form);
-      form.addEventListener("change", atualizar);
-      atualizar();
-    }
+    if (tipo === "avaliacao" && atv) ligarQuestionario(form, tipo, evento);
     form.onsubmit = (e) => {
       e.preventDefault();
       enviarLancamento(form, tipo);
     };
   }
 
+  // ---------------- Questionário de avaliação ----------------
+  // Perguntas do modelo atual (editável pelo administrador) para o perfil avaliado.
+  const perguntasAvaliacao = (cat) => R.perguntasDoModelo(S.modeloAvaliacao(), cat);
+
+  // Colaborador avaliado: o coordenador vê primeiro a própria equipe; quem já foi avaliado no ciclo fica bloqueado.
+  function campoAvaliado(evento) {
+    const feitos = pontuadosNaAtividade(evento.id);
+    const todos = pessoasAtivas();
+    const u = state.usuario;
+    const equipe = u.perfil === "lider" ? todos.filter((p) => p.coordenadorId === u.id) : [];
+    const opcao = (p) => {
+      const feito = feitos.has(p.id);
+      return `<option value="${p.id}" ${feito ? "disabled" : state.pessoaPreSelecionada === p.id ? "selected" : ""}>${esc(nomeBonito(p.nome))}${feito ? " — já avaliado(a) neste ciclo" : ""}</option>`;
+    };
+    const grupo = (rotulo, lista) => (lista.length ? `<optgroup label="${rotulo}">${lista.map(opcao).join("")}</optgroup>` : "");
+    const resto = todos.filter((p) => !equipe.includes(p));
+    return `<label class="field field-wide"><span>Colaborador(a) avaliado(a)</span><select name="pessoaId" id="avaliado" required>
+      <option value="">Escolha quem será avaliado…</option>
+      ${grupo("Minha equipe", equipe)}
+      ${grupo(R.categorias.adm, resto.filter((p) => p.categoria === "adm"))}
+      ${grupo(R.categorias.adv, resto.filter((p) => p.categoria === "adv"))}
+      ${grupo("Sem perfil definido", resto.filter((p) => !p.categoria))}
+    </select></label>`;
+  }
+
+  function questionarioAvaliacao(form, evento) {
+    const pessoa = state.pessoaPreSelecionada && S.listarPessoas().find((p) => p.id === state.pessoaPreSelecionada);
+    const cat = pessoa ? pessoa.categoria || form.dataset.cat || "" : "";
+    form.dataset.cat = cat;
+    const cabeca = `
+      ${campoAvaliado(evento)}
+      <label class="field"><span>${cat === "adv" ? "Área de atuação" : "Setor"}</span><input name="area" placeholder="${cat === "adv" ? "Ex.: Trabalhista, Energisa PB" : "Ex.: Controladoria"}" value="${esc(pessoa?.setor || "")}" /></label>`;
+    if (!pessoa) return `${cabeca}<div class="quiz-vazio field-full">${ico("avaliacao")}<p><b>Escolha o colaborador para abrir o questionário.</b><br>As perguntas aparecem de acordo com o perfil (Controladoria e Administrativo ou Advogados Associados).</p></div>`;
+
+    const seletorPerfil = pessoa.categoria
+      ? ""
+      : `<div class="field field-full"><span>Este colaborador ainda não tem perfil. Qual questionário usar?</span>
+          <div class="seg">${R.categoriasPontuaveis.map((c) => `<button type="button" data-cat="${c}" class="${cat === c ? "active" : ""}">${R.categorias[c]}</button>`).join("")}</div></div>`;
+    if (!cat) return cabeca + seletorPerfil;
+
+    const perguntas = perguntasAvaliacao(cat);
+    const areas = S.modeloAvaliacao()[cat].areas.filter((a) => perguntas.some((q) => q.areaId === a.id));
+    let n = 0;
+    return `${cabeca}${seletorPerfil}
+      <div class="field-full quiz">
+        <div class="quiz-progresso" id="quizProg" aria-live="polite"></div>
+        ${areas
+          .map((a) => {
+            const qs = perguntas.filter((q) => q.areaId === a.id);
+            return `<section class="quiz-area" data-grupo="${a.grupo}">
+              <header><div><small>${R.grupos[a.grupo]}</small><h3>${esc(a.nome)}</h3></div><span class="quiz-area-soma" data-area-soma="${esc(a.id)}"></span></header>
+              ${qs
+                .map((q) => {
+                  n += 1;
+                  return `<fieldset class="quiz-q" data-q="${esc(q.id)}" data-area="${esc(a.id)}">
+                    <legend><span class="quiz-n">${n}</span><span class="quiz-enunciado"><b>${esc(q.texto)}</b>${q.descricao ? `<small>${esc(q.descricao)}</small>` : ""}</span></legend>
+                    <div class="quiz-escala">
+                      ${q.valores
+                        .map((v, nivel) => `<label class="nivel-${nivel}"><input type="radio" name="n_${esc(q.id)}" value="${v}" /><span><i aria-hidden="true"></i><b>${R.rotulosNota[nivel]}</b><em>${fmt(v)} Savacoins</em></span></label>`)
+                        .join("")}
+                    </div>
+                  </fieldset>`;
+                })
+                .join("")}
+            </section>`;
+          })
+          .join("")}
+      </div>
+      <label class="field field-full"><span>Mensagem de feedback para o colaborador</span><textarea name="feedback" rows="3" placeholder="O que foi muito bem e o que pode melhorar no período"></textarea></label>
+      <label class="field field-full"><span>Merece algum destaque especial? Descreva</span><textarea name="destaque" rows="2"></textarea></label>`;
+  }
+
+  function ligarQuestionario(form, tipo, evento) {
+    $("#avaliado", form)?.addEventListener("change", (e) => {
+      state.pessoaPreSelecionada = e.target.value || null;
+      form.dataset.cat = "";
+      montarFormulario(form, tipo, evento);
+      $(".quiz-q", form)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    $$("[data-cat]", form).forEach((b) =>
+      b.addEventListener("click", () => {
+        form.dataset.cat = b.dataset.cat;
+        montarFormulario(form, tipo, evento);
+      }),
+    );
+    form.onchange = null;
+    if (!$(".quiz", form)) return;
+    // Ao responder, a pergunta fica marcada e a tela segue para a próxima ainda sem resposta.
+    form.onchange = (e) => {
+      const q = e.target.closest(".quiz-q");
+      if (!q) return;
+      const primeira = !q.classList.contains("ok");
+      q.classList.add("ok");
+      q.classList.remove("falta");
+      resumoAvaliacao(form);
+      if (primeira) {
+        const proxima = $$(".quiz-q", form).find((x) => !x.classList.contains("ok"));
+        proxima?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    };
+    resumoAvaliacao(form);
+  }
+
   function lerNotas(form) {
-    const cat = form.dataset.cat;
     const notas = {};
-    R.criterios[cat].forEach((c) => {
-      const marcado = $(`input[name="n_${c.id}"]:checked`, form);
-      if (marcado) notas[c.id] = Number(marcado.value);
+    perguntasAvaliacao(form.dataset.cat).forEach((q) => {
+      const marcado = $$(`input[type="radio"]`, form).find((i) => i.name === `n_${q.id}` && i.checked);
+      if (marcado) notas[q.id] = Number(marcado.value);
     });
     return notas;
   }
 
+  // Barra de progresso fixa: respondidas, Savacoins até agora e selos que a avaliação vai render.
   function resumoAvaliacao(form) {
-    const cat = form.dataset.cat;
+    const perguntas = perguntasAvaliacao(form.dataset.cat);
     const notas = lerNotas(form);
-    const grupo = (g) => R.criterios[cat].filter((c) => c.grupo === g);
-    const soma = (g) => grupo(g).reduce((t, c) => t + (notas[c.id] || 0), 0);
-    const max = (g) => grupo(g).reduce((t, c) => t + c.max, 0);
-    const completos = Object.keys(notas).length === R.criterios[cat].length;
-    const selos = completos ? R.selosDaAvaliacao(cat, notas) : [];
-    $("#evalSummary", form).innerHTML = `
-      <div class="sum-item"><span>Técnico</span><b>${fmt(soma("tecnica"))} / ${fmt(max("tecnica"))}</b></div>
-      <div class="sum-item"><span>Socioemocional</span><b>${fmt(soma("socio"))} / ${fmt(max("socio"))}</b></div>
-      <div class="sum-item total"><span>Total do lançamento</span><b>${fmt(soma("tecnica") + soma("socio"))} Savacoins</b></div>
-      <div class="sum-item"><span>Selos</span><b>${selos.length ? selos.map((s) => R.selos.find((x) => x.id === s).nome).join(", ") : "—"}</b></div>`;
+    const respostas = perguntas.filter((q) => q.id in notas).map((q) => ({ grupo: q.grupo, valor: notas[q.id], max: q.max }));
+    const feitas = respostas.length;
+    const total = respostas.reduce((t, r) => t + r.valor, 0);
+    const maximo = perguntas.reduce((t, q) => t + q.max, 0);
+    const completo = feitas === perguntas.length;
+    const selos = completo ? R.selosDaAvaliacao({ respostas: perguntas.map((q) => ({ grupo: q.grupo, valor: notas[q.id], max: q.max })) }) : [];
+    $("#quizProg", form).innerHTML = `
+      <div class="quiz-prog-txt"><b>${feitas} de ${perguntas.length}</b> respondidas</div>
+      <div class="quiz-barra"><i style="width:${perguntas.length ? (feitas / perguntas.length) * 100 : 0}%"></i></div>
+      <div class="quiz-prog-pts"><b>${fmt(total)}</b> <small>/ ${fmt(maximo)} Savacoins</small></div>
+      ${selos.length ? `<div class="quiz-selos">${selos.map((s) => `<span>${R.selos.find((x) => x.id === s).nome}</span>`).join("")}</div>` : ""}`;
+    $("#quizProg", form).classList.toggle("completo", completo);
+    $$("[data-area-soma]", form).forEach((elSoma) => {
+      const qs = perguntas.filter((q) => q.areaId === elSoma.dataset.areaSoma);
+      elSoma.textContent = `${fmt(qs.reduce((t, q) => t + (notas[q.id] || 0), 0))} / ${fmt(qs.reduce((t, q) => t + q.max, 0))}`;
+    });
+  }
+
+  // ---------------- Modelo de avaliação (editor do administrador) ----------------
+  // Edita uma cópia (rascunho) e só grava ao clicar em "Salvar modelo". As avaliações já registradas
+  // guardam as perguntas respondidas, então mudar o modelo vale só para as próximas.
+  const novoId = (prefixo) => `${prefixo}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+  function renderModeloAvaliacao(el) {
+    if (state.usuario.perfil !== "admin") {
+      state.lanc.aberto = null;
+      return renderLancamentos(el);
+    }
+    const ed = (state.modeloEd ||= { cat: "adm", rascunho: structuredClone(S.modeloAvaliacao()), alterado: false });
+    const m = ed.rascunho[ed.cat];
+    const perguntasDaArea = (id) => m.perguntas.filter((q) => q.areaId === id);
+    const maxGrupo = (g) =>
+      m.perguntas.filter((q) => m.areas.find((a) => a.id === q.areaId)?.grupo === g).reduce((t, q) => t + Math.max(0, ...q.valores.map(Number)), 0);
+    let n = 0;
+
+    el.innerHTML = `
+      <div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para lançamentos</button></div>
+      <section class="ev-banner" style="--c:${tipos.avaliacao.cor}">
+        <span class="ev-banner-ico">${tipos.avaliacao.icone}</span>
+        <div class="ev-banner-txt"><small>Ciclo de avaliação</small><h2>Modelo do questionário</h2><p>Organize as perguntas por área. Cada área conta para o grupo Técnico ou Socioemocional (que definem os selos), e cada pergunta tem 4 níveis de resposta com os Savacoins de cada um.</p></div>
+        <dl class="ev-banner-dados">
+          <div><dt>Perguntas</dt><dd>${m.perguntas.length}</dd></div>
+          <div><dt>Técnico (máx.)</dt><dd>${fmt(maxGrupo("tecnica"))}</dd></div>
+          <div><dt>Socioemocional (máx.)</dt><dd>${fmt(maxGrupo("socio"))}</dd></div>
+          <div><dt>Total (máx.)</dt><dd>${fmt(maxGrupo("tecnica") + maxGrupo("socio"))}</dd></div>
+        </dl>
+      </section>
+      <div class="modelo-topo">
+        <div class="seg" role="tablist">${R.categoriasPontuaveis.map((c) => `<button type="button" data-mcat="${c}" class="${ed.cat === c ? "active" : ""}">${R.categorias[c]}</button>`).join("")}</div>
+        <span class="muted small">As mudanças valem para as próximas avaliações; as já registradas não mudam.</span>
+      </div>
+      <div id="modeloAreas">
+        ${m.areas
+          .map(
+            (a, ia) => `<section class="card modelo-area" data-area="${esc(a.id)}">
+              <header class="modelo-area-head">
+                <input class="modelo-area-nome" data-campo="nome" value="${esc(a.nome)}" placeholder="Nome da área (ex.: Domínio técnico)" aria-label="Nome da área" />
+                <select data-campo="grupo" aria-label="Grupo da área">${Object.entries(R.grupos).map(([g, nome]) => `<option value="${g}" ${a.grupo === g ? "selected" : ""}>${nome}</option>`).join("")}</select>
+                <div class="row-actions">
+                  ${ia ? btnIcone("subir", "Subir área", "data-area-subir", a.id) : ""}
+                  ${btnExcluir("data-area-excluir", a.id)}
+                </div>
+              </header>
+              <div class="modelo-perguntas">
+                ${perguntasDaArea(a.id)
+                  .map((q, iq) => {
+                    n += 1;
+                    return `<div class="modelo-q" data-q="${esc(q.id)}">
+                      <span class="quiz-n">${n}</span>
+                      <div class="modelo-q-corpo">
+                        <input data-campo="texto" value="${esc(q.texto)}" placeholder="Pergunta (ex.: Entrega os trabalhos com qualidade técnica?)" aria-label="Texto da pergunta" />
+                        <input data-campo="descricao" class="modelo-q-desc" value="${esc(q.descricao || "")}" placeholder="Orientação para quem avalia (opcional)" aria-label="Orientação da pergunta" />
+                        <div class="modelo-valores">
+                          ${q.valores.map((v, i) => `<label class="nivel-${i}"><span>${R.rotulosNota[i]}</span><input type="number" min="0" step="25" data-valor="${i}" value="${v}" /></label>`).join("")}
+                        </div>
+                      </div>
+                      <div class="row-actions modelo-q-acoes">
+                        ${iq ? btnIcone("subir", "Subir pergunta", "data-q-subir", q.id) : ""}
+                        ${btnExcluir("data-q-excluir", q.id)}
+                      </div>
+                    </div>`;
+                  })
+                  .join("") || `<p class="muted small modelo-vazio">Nenhuma pergunta nesta área ainda.</p>`}
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" data-q-nova="${esc(a.id)}">+ Adicionar pergunta</button>
+            </section>`,
+          )
+          .join("")}
+      </div>
+      <button type="button" class="btn btn-ghost modelo-nova-area" id="novaArea">+ Nova área</button>
+      <div class="modelo-rodape">
+        <button type="button" class="link-btn danger" id="modeloPadrao">Restaurar modelo padrão</button>
+        <span class="modelo-status">${ed.alterado ? "Alterações não salvas" : "Tudo salvo"}</span>
+        <button type="button" class="btn btn-ghost" id="modeloDescartar" ${ed.alterado ? "" : "disabled"}>Descartar</button>
+        <button type="button" class="btn btn-gold" id="modeloSalvar" ${ed.alterado ? "" : "disabled"}>Salvar modelo</button>
+      </div>`;
+
+    const redesenhar = () => {
+      ed.alterado = true;
+      const y = window.scrollY;
+      renderModeloAvaliacao(el);
+      window.scrollTo({ top: y });
+    };
+    const marcarAlterado = () => {
+      if (ed.alterado) return;
+      ed.alterado = true;
+      $(".modelo-status", el).textContent = "Alterações não salvas";
+      $("#modeloSalvar", el).disabled = false;
+      $("#modeloDescartar", el).disabled = false;
+    };
+    const sair = async () => {
+      if (ed.alterado && !(await confirmar({ titulo: "Sair sem salvar?", mensagem: "As alterações no modelo serão descartadas.", acao: "Sair sem salvar", perigo: true }))) return;
+      state.modeloEd = null;
+      abrirLancamento(null);
+    };
+    $("#voltarLanc", el).addEventListener("click", sair);
+    $$("[data-mcat]", el).forEach((b) => b.addEventListener("click", () => ((ed.cat = b.dataset.mcat), renderModeloAvaliacao(el))));
+
+    // Digitação: atualiza o rascunho sem redesenhar (o cursor não pula).
+    $("#modeloAreas", el).addEventListener("input", (e) => {
+      const area = m.areas.find((a) => a.id === e.target.closest("[data-area]")?.dataset.area);
+      const q = m.perguntas.find((x) => x.id === e.target.closest("[data-q]")?.dataset.q);
+      if (q && e.target.dataset.valor != null) q.valores[Number(e.target.dataset.valor)] = Number(e.target.value);
+      else if (q && e.target.dataset.campo) q[e.target.dataset.campo] = e.target.value;
+      else if (area && e.target.dataset.campo) area[e.target.dataset.campo] = e.target.value;
+      marcarAlterado();
+    });
+    $("#modeloAreas", el).addEventListener("change", (e) => {
+      if (e.target.dataset.campo === "grupo" || e.target.dataset.valor != null) redesenhar(); // atualiza os totais
+    });
+
+    const mover = (lista, i) => i > 0 && ([lista[i - 1], lista[i]] = [lista[i], lista[i - 1]]);
+    $$("[data-area-subir]", el).forEach((b) => b.addEventListener("click", () => (mover(m.areas, m.areas.findIndex((a) => a.id === b.dataset.areaSubir)), redesenhar())));
+    $$("[data-q-subir]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        const q = m.perguntas.find((x) => x.id === b.dataset.qSubir);
+        const irmas = m.perguntas.filter((x) => x.areaId === q.areaId);
+        const anterior = irmas[irmas.indexOf(q) - 1];
+        const i = m.perguntas.indexOf(q);
+        const j = m.perguntas.indexOf(anterior);
+        [m.perguntas[i], m.perguntas[j]] = [m.perguntas[j], m.perguntas[i]];
+        redesenhar();
+      }),
+    );
+    $$("[data-q-excluir]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        m.perguntas = m.perguntas.filter((q) => q.id !== b.dataset.qExcluir);
+        redesenhar();
+      }),
+    );
+    $$("[data-area-excluir]", el).forEach((b) =>
+      b.addEventListener("click", async () => {
+        const area = m.areas.find((a) => a.id === b.dataset.areaExcluir);
+        const qtd = perguntasDaArea(area.id).length;
+        if (qtd && !(await confirmar({ titulo: "Excluir área?", mensagem: `<b>${esc(area.nome || "Área sem nome")}</b> e suas ${qtd} pergunta(s) saem do modelo.`, acao: "Excluir", perigo: true }))) return;
+        m.areas = m.areas.filter((a) => a.id !== area.id);
+        m.perguntas = m.perguntas.filter((q) => q.areaId !== area.id);
+        redesenhar();
+      }),
+    );
+    $$("[data-q-nova]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        const ultima = perguntasDaArea(b.dataset.qNova).at(-1);
+        m.perguntas.push({ id: novoId("q"), areaId: b.dataset.qNova, texto: "", descricao: "", valores: ultima ? [...ultima.valores] : [125, 250, 375, 500] });
+        redesenhar();
+        $$(`[data-area="${b.dataset.qNova}"] .modelo-q input[data-campo="texto"]`, el).at(-1)?.focus();
+      }),
+    );
+    $("#novaArea", el).addEventListener("click", () => {
+      m.areas.push({ id: novoId("a"), nome: "", grupo: "tecnica" });
+      redesenhar();
+      $$(".modelo-area-nome", el).at(-1)?.focus();
+    });
+    $("#modeloDescartar", el).addEventListener("click", () => {
+      state.modeloEd = null;
+      renderModeloAvaliacao(el);
+    });
+    $("#modeloPadrao", el).addEventListener("click", async () => {
+      const sim = await confirmar({ titulo: "Restaurar modelo padrão?", mensagem: "As perguntas voltam a ser as do formulário 2026, nos dois perfis.", acao: "Restaurar", perigo: true });
+      if (!sim) return;
+      const r = await executar(() => S.salvarModeloAvaliacao(null, { restaurar: true }), { carregando: "Restaurando modelo…", concluido: "Modelo padrão restaurado" });
+      if (r.ok) {
+        state.modeloEd = null;
+        renderModeloAvaliacao(el);
+      }
+    });
+    $("#modeloSalvar", el).addEventListener("click", async () => {
+      const r = await executar(() => S.salvarModeloAvaliacao(ed.rascunho), {
+        carregando: "Salvando modelo…",
+        concluido: "Modelo de avaliação salvo",
+        detalhe: "As próximas avaliações já usam as novas perguntas.",
+      });
+      if (r.ok) {
+        state.modeloEd = null;
+        renderModeloAvaliacao(el);
+      }
+    });
   }
 
   async function enviarLancamento(form, tipo) {
@@ -1063,8 +1351,14 @@
       if (tipo === "protagonista" && !dados.justificativa) return (erro.textContent = "Descreva o motivo da indicação.");
       if (tipo === "avaliacao") {
         dados.categoria = form.dataset.cat;
+        if (!dados.categoria) return (erro.textContent = "Escolha qual questionário usar para este colaborador.");
         dados.notas = lerNotas(form);
-        if (Object.keys(dados.notas).length < R.criterios[dados.categoria].length) return (erro.textContent = "Preencha a nota de todos os critérios.");
+        const faltam = $$(".quiz-q", form).filter((q) => !q.classList.contains("ok"));
+        if (faltam.length) {
+          faltam.forEach((q) => q.classList.add("falta"));
+          faltam[0].scrollIntoView({ behavior: "smooth", block: "center" });
+          return (erro.textContent = `Faltam ${faltam.length} pergunta(s) para responder.`);
+        }
         dados.area = (fd.get("area") || "").trim();
         dados.feedback = (fd.get("feedback") || "").trim();
         dados.destaque = (fd.get("destaque") || "").trim();

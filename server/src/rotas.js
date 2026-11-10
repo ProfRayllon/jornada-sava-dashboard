@@ -68,6 +68,67 @@ async function lerAnosPublicados(c = pool) {
   }
 }
 
+// ---------- Modelo de avaliação (questionário editável pelo administrador) ----------
+async function lerModeloAvaliacao(c = pool) {
+  const { rows } = await c.query("SELECT valor FROM meta WHERE chave = 'modelo_avaliacao'");
+  try {
+    const modelo = JSON.parse(rows[0]?.valor || "null");
+    if (modelo?.adm && modelo?.adv) return modelo;
+  } catch {
+    // modelo corrompido: usa o padrão
+  }
+  return R.modeloPadrao();
+}
+
+// Confere e limpa o modelo enviado pelo administrador.
+function validarModelo(b) {
+  const modelo = {};
+  for (const cat of R.categoriasPontuaveis) {
+    const m = b?.[cat];
+    if (!m || !Array.isArray(m.areas) || !Array.isArray(m.perguntas)) throw new ErroDeUso("Modelo de avaliação inválido.");
+    const nomeCat = R.categorias[cat];
+    const areas = m.areas.map((a) => ({ id: texto(a.id, 60), nome: texto(a.nome, 120), grupo: a.grupo }));
+    if (!areas.length) throw new ErroDeUso(`${nomeCat}: crie ao menos uma área.`);
+    for (const a of areas) {
+      if (!a.id || !a.nome) throw new ErroDeUso(`${nomeCat}: dê um nome a todas as áreas.`);
+      if (!R.grupos[a.grupo]) throw new ErroDeUso(`${nomeCat}: escolha se a área “${a.nome}” é técnica ou socioemocional.`);
+    }
+    if (new Set(areas.map((a) => a.id)).size !== areas.length) throw new ErroDeUso("Áreas repetidas no modelo.");
+    const idsAreas = new Set(areas.map((a) => a.id));
+    const perguntas = m.perguntas.map((q) => ({
+      id: texto(q.id, 60),
+      areaId: texto(q.areaId, 60),
+      texto: texto(q.texto, 400),
+      descricao: texto(q.descricao, 600),
+      valores: Array.isArray(q.valores) ? q.valores.map((v) => Math.round(Number(v))) : [],
+    }));
+    if (!perguntas.length) throw new ErroDeUso(`${nomeCat}: o questionário precisa de ao menos uma pergunta.`);
+    for (const q of perguntas) {
+      if (!q.id || !idsAreas.has(q.areaId)) throw new ErroDeUso(`${nomeCat}: há pergunta sem área.`);
+      if (!q.texto) throw new ErroDeUso(`${nomeCat}: escreva o texto de todas as perguntas.`);
+      const v = q.valores;
+      if (v.length !== R.rotulosNota.length || v.some((n) => !Number.isFinite(n) || n < 0) || v.some((n, i) => i && n <= v[i - 1]))
+        throw new ErroDeUso(`${nomeCat}: em “${q.texto.slice(0, 60)}”, os Savacoins dos 4 níveis precisam ser crescentes.`);
+    }
+    if (new Set(perguntas.map((q) => q.id)).size !== perguntas.length) throw new ErroDeUso("Perguntas repetidas no modelo.");
+    modelo[cat] = { areas, perguntas };
+  }
+  return modelo;
+}
+
+rotas.put("/modelo-avaliacao", auth.exigir("admin"), assincrono(async (req, res) => {
+  const modelo = req.body?.restaurar ? R.modeloPadrao() : validarModelo(req.body?.modelo);
+  await transacao(async (c) => {
+    await c.query(
+      "INSERT INTO meta (chave, valor) VALUES ('modelo_avaliacao', $1) ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor",
+      [JSON.stringify(modelo)],
+    );
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ modelo });
+}));
+
 // Homepage pública: só o necessário para somar o ranking, sem notas, feedbacks nem autores,
 // e só dos anos que o administrador publicou no site.
 rotas.get("/publico", assincrono(async (req, res) => {
@@ -100,7 +161,8 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
     const { rows } = await pool.query("SELECT id, nome, ativo FROM usuarios WHERE perfil = 'lider' ORDER BY nome");
     coordenadores = rows;
   }
-  res.json({ eu: req.usuario, usuarios, coordenadores, ...tudo });
+  const modeloAvaliacao = await lerModeloAvaliacao();
+  res.json({ eu: req.usuario, usuarios, coordenadores, modeloAvaliacao, ...tudo });
 }));
 
 // Publica ou oculta um ano na homepage (só administrador).
@@ -425,14 +487,19 @@ async function validarLancamento(b, usuario) {
   if (tipo === "indicacao") dados.pontos = R.pontosIndicacao;
   if (tipo === "protagonista" && !dados.justificativa) throw new ErroDeUso("Descreva o motivo da indicação.");
   if (tipo === "avaliacao") {
-    const criterios = R.criterios[b.categoria];
-    if (!criterios) throw new ErroDeUso("Categoria da avaliação inválida.");
+    if (!R.criterios[b.categoria]) throw new ErroDeUso("Categoria da avaliação inválida.");
+    // As perguntas vêm do modelo atual; o lançamento guarda uma cópia do que foi respondido,
+    // para que mudanças futuras no modelo não alterem avaliações já feitas.
+    const perguntas = R.perguntasDoModelo(await lerModeloAvaliacao(), b.categoria);
     dados.categoria = b.categoria;
     dados.notas = {};
-    for (const c of criterios) {
-      const nota = Number(b.notas?.[c.id]);
-      if (!c.opcoes.some((o) => o.valor === nota)) throw new ErroDeUso("Preencha a nota de todos os critérios.");
-      dados.notas[c.id] = nota;
+    dados.respostas = [];
+    for (const q of perguntas) {
+      const nota = Number(b.notas?.[q.id]);
+      const nivel = q.valores.indexOf(nota);
+      if (nivel < 0) throw new ErroDeUso("Responda todas as perguntas da avaliação.");
+      dados.notas[q.id] = nota;
+      dados.respostas.push({ id: q.id, texto: q.texto, area: q.area.nome, grupo: q.grupo, nivel, valor: nota, max: q.max });
     }
     dados.area = texto(b.area, 120);
     dados.feedback = texto(b.feedback);

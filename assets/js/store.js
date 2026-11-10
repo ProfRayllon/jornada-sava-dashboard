@@ -64,7 +64,7 @@
       estado = await api("publico");
     }
     eu = estado.eu || null;
-    db = { usuarios: estado.usuarios || [], coordenadores: estado.coordenadores || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], anosPublicados: estado.anosPublicados || null, atualizadoEm: estado.atualizadoEm };
+    db = { usuarios: estado.usuarios || [], coordenadores: estado.coordenadores || [], modeloAvaliacao: estado.modeloAvaliacao || null, pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], anosPublicados: estado.anosPublicados || null, atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
@@ -153,6 +153,17 @@
   }
 
   // ---------- Usuários (equipe) ----------
+  // Modelo de avaliação (áreas e perguntas). Sem servidor, usa o padrão das regras.
+  function modeloAvaliacao() {
+    return db?.modeloAvaliacao || R.modeloPadrao();
+  }
+
+  async function salvarModeloAvaliacao(modelo, { restaurar = false } = {}) {
+    const r = await api("modelo-avaliacao", { metodo: "PUT", corpo: restaurar ? { restaurar: true } : { modelo } });
+    await aposEscrita();
+    return r.modelo;
+  }
+
   // Logins com perfil Coordenador (id interno "lider"), para o cadastro de colaboradores.
   function listarCoordenadores() {
     return db?.coordenadores || [];
@@ -404,6 +415,8 @@
     trocarSenha,
     listarUsuarios,
     listarCoordenadores,
+    modeloAvaliacao,
+    salvarModeloAvaliacao,
     salvarUsuario,
     listarPessoas,
     salvarPessoa,
