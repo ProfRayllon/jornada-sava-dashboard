@@ -1063,11 +1063,6 @@
         ${gruposUsados
           .map(
             (g) => `<div class="quiz-painel" data-painel="${g}">
-              <div class="quiz-grupo-titulo" style="--g:${g === "socio" ? "#7c2ba8" : "#1e66b2"}">
-                <span class="quiz-aba-ico">${ico(g === "socio" ? "felicidade" : "avaliacao")}</span>
-                <span class="quiz-aba-txt"><b>${R.grupos[g]}</b><small data-aba-prog="${g}"></small></span>
-                <span class="quiz-aba-check" aria-hidden="true">✓</span>
-              </div>
               ${areas
                 .filter((a) => a.grupo === g)
                 .map((a) => {
