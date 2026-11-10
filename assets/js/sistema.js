@@ -47,7 +47,7 @@
   const perfis = {
     admin: { nome: "Administrador", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
     rh: { nome: "RH", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
-    lider: { nome: "Líder avaliador", tipos: ["avaliacao"] },
+    lider: { nome: "Coordenador", tipos: ["avaliacao"] },
   };
 
   const tipos = {
@@ -1176,7 +1176,7 @@
   // ---------------- Pessoas ----------------
   function renderPessoas(el) {
     const lista = S.listarPessoas().sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome));
-    const porId = new Map(lista.map((p) => [p.id, p]));
+    const coordPorId = new Map(S.listarCoordenadores().map((c) => [c.id, c]));
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
@@ -1192,7 +1192,7 @@
                   (p) => `<tr class="${p.ativo ? "" : "inactive"}">
                   <td>${S.fotoUrl(p) ? `<img class="pessoa-foto" src="${S.fotoUrl(p)}" alt="" loading="lazy" />` : `<span class="avatar sm">${esc(iniciais(p.nome))}</span>`}</td>
                   <td><strong>${esc(nomeBonito(p.nome))}</strong></td>
-                  <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}${porId.get(p.coordenadorId) ? `<small>Coord.: ${esc(nomeBonito(porId.get(p.coordenadorId).nome))}</small>` : ""}</td>
+                  <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}${coordPorId.get(p.coordenadorId) ? `<small>Coord.: ${esc(coordPorId.get(p.coordenadorId).nome)}</small>` : ""}</td>
                   <td>${esc(p.setor || "—")}</td>
                   <td>${p.origem === "base" ? "Planilha 2026" : "Sistema"}</td>
                   <td><span class="status ${p.ativo ? "on" : ""}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
@@ -1233,9 +1233,7 @@
   const prepararFoto = (arquivo) => S.prepararFoto(arquivo);
 
   function formPessoa(p = {}) {
-    const coordenadores = S.listarPessoas()
-      .filter((c) => c.categoria === "coord" && c.id !== p.id && (c.ativo || c.id === p.coordenadorId))
-      .sort((a, b) => a.nome.localeCompare(b.nome));
+    const coordenadores = S.listarCoordenadores().filter((c) => c.ativo || c.id === p.coordenadorId);
     // O campo só aparece quando já existe algum coordenador para escolher.
     const temCoordenador = (cat) => coordenadores.length > 0 && R.categoriasPontuaveis.includes(cat);
     abrirModal(
@@ -1262,7 +1260,7 @@
         <label class="field"><span>Setor / área de atuação</span><input name="setor" value="${esc(p.setor || "")}" /></label>
         <label class="field field-full" id="campoCoord" ${temCoordenador(p.categoria) ? "" : "hidden"}><span>Coordenador (opcional)</span><select name="coordenadorId">
           <option value="">Sem coordenador</option>
-          ${coordenadores.map((c) => `<option value="${esc(c.id)}" ${p.coordenadorId === c.id ? "selected" : ""}>${esc(nomeBonito(c.nome))}${c.ativo ? "" : " (inativo)"}</option>`).join("")}
+          ${coordenadores.map((c) => `<option value="${esc(c.id)}" ${p.coordenadorId === c.id ? "selected" : ""}>${esc(c.nome)}${c.ativo ? "" : " (bloqueado)"}</option>`).join("")}
         </select></label>
         ${p.id ? `<label class="check-line field-full"><input type="checkbox" name="ativo" ${p.ativo ? "checked" : ""} /> Participa da jornada (ativo)</label>` : ""}
         <p class="form-error field-full" id="pfErro"></p>
@@ -1335,7 +1333,7 @@
         <div class="roles">
           <div><b>Administrador</b><small>Tudo, inclusive equipe e acessos.</small></div>
           <div><b>RH</b><small>Presenças, eventos, missões, indicações, avaliações e cadastro de colaboradores.</small></div>
-          <div><b>Líder avaliador</b><small>Avaliações dos colaboradores ao longo do ano.</small></div>
+          <div><b>Coordenador</b><small>Avaliações dos colaboradores ao longo do ano.</small></div>
         </div>
         <div class="table-wrap">
           <table class="table">

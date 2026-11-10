@@ -94,7 +94,13 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
     const { rows } = await pool.query("SELECT * FROM usuarios ORDER BY nome");
     usuarios = rows.map(usuarioPublico);
   }
-  res.json({ eu: req.usuario, usuarios, ...tudo });
+  // Coordenadores (logins com perfil "lider"), para o cadastro de colaboradores (admin e RH).
+  let coordenadores = [];
+  if (["admin", "rh"].includes(req.usuario.perfil)) {
+    const { rows } = await pool.query("SELECT id, nome, ativo FROM usuarios WHERE perfil = 'lider' ORDER BY nome");
+    coordenadores = rows;
+  }
+  res.json({ eu: req.usuario, usuarios, coordenadores, ...tudo });
 }));
 
 // Publica ou oculta um ano na homepage (só administrador).
@@ -184,6 +190,8 @@ async function salvarUsuario(req, res) {
       linha = r.rows[0];
     }
     if (!linha.ativo) await c.query("DELETE FROM sessoes WHERE usuario_id = $1", [linha.id]);
+    // Quem deixou de ser coordenador sai como coordenador dos colaboradores.
+    if (linha.perfil !== "lider") await c.query("UPDATE pessoas SET coordenador_id = NULL WHERE coordenador_id = $1", [linha.id]);
 
     const admins = await c.query("SELECT count(*)::int AS n FROM usuarios WHERE perfil = 'admin' AND ativo");
     if (!admins.rows[0].n) throw new ErroDeUso("O sistema precisa de pelo menos um administrador ativo.");
@@ -209,11 +217,11 @@ async function salvarPessoa(req, res) {
     const { rows: todas } = await c.query("SELECT id, nome FROM pessoas");
     if (todas.some((p) => p.id !== id && normalizar(p.nome) === normalizar(nome))) throw new ErroDeUso("Esta pessoa já está cadastrada.");
 
-    // Coordenador (opcional): só para quem pontua, e precisa ser alguém cadastrado como coordenador.
-    let coordenadorId = R.categoriasPontuaveis.includes(b.categoria) && b.coordenadorId ? String(b.coordenadorId) : null;
+    // Coordenador (opcional): só para quem pontua, e precisa ser um login com perfil Coordenador.
+    const coordenadorId = R.categoriasPontuaveis.includes(b.categoria) && b.coordenadorId ? String(b.coordenadorId) : null;
     if (coordenadorId) {
-      const { rows: coord } = await c.query("SELECT categoria FROM pessoas WHERE id = $1", [coordenadorId]);
-      if (coordenadorId === id || coord[0]?.categoria !== "coord") throw new ErroDeUso("Escolha um coordenador válido.");
+      const { rows: coord } = await c.query("SELECT perfil FROM usuarios WHERE id = $1", [coordenadorId]);
+      if (coord[0]?.perfil !== "lider") throw new ErroDeUso("Escolha um coordenador válido.");
     }
 
     let r;
@@ -222,8 +230,6 @@ async function salvarPessoa(req, res) {
         id, nome, b.categoria, texto(b.setor, 120), typeof b.ativo === "boolean" ? b.ativo : null, coordenadorId,
       ]);
       if (!r.rowCount) throw new ErroDeUso("Colaborador não encontrado.", 404);
-      // Quem deixou de ser coordenador não pode continuar como coordenador de ninguém.
-      if (b.categoria !== "coord") await c.query("UPDATE pessoas SET coordenador_id = NULL WHERE coordenador_id = $1", [id]);
     } else {
       r = await c.query("INSERT INTO pessoas (id, nome, categoria, setor, coordenador_id) VALUES ($1, $2, $3, $4, $5) RETURNING *", [uid("p"), nome, b.categoria, texto(b.setor, 120), coordenadorId]);
     }

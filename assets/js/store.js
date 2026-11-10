@@ -64,7 +64,7 @@
       estado = await api("publico");
     }
     eu = estado.eu || null;
-    db = { usuarios: estado.usuarios || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], anosPublicados: estado.anosPublicados || null, atualizadoEm: estado.atualizadoEm };
+    db = { usuarios: estado.usuarios || [], coordenadores: estado.coordenadores || [], pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], anosPublicados: estado.anosPublicados || null, atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
@@ -153,6 +153,11 @@
   }
 
   // ---------- Usuários (equipe) ----------
+  // Logins com perfil Coordenador (id interno "lider"), para o cadastro de colaboradores.
+  function listarCoordenadores() {
+    return db?.coordenadores || [];
+  }
+
   function listarUsuarios() {
     return db?.usuarios || [];
   }
@@ -398,6 +403,7 @@
     usuarioAtual,
     trocarSenha,
     listarUsuarios,
+    listarCoordenadores,
     salvarUsuario,
     listarPessoas,
     salvarPessoa,
