@@ -1039,7 +1039,6 @@
     const perguntas = perguntasAvaliacao(cat);
     const areas = S.modeloAvaliacao()[cat].areas.filter((a) => admin || perguntas.some((q) => q.areaId === a.id));
     const gruposUsados = Object.keys(R.grupos).filter((g) => areas.some((a) => a.grupo === g));
-    if (!gruposUsados.includes(state.quizGrupo)) state.quizGrupo = gruposUsados[0];
     let n = 0;
     const pergunta = (q, a) => {
       n += 1;
@@ -1060,60 +1059,38 @@
     return `${cabeca}${seletorPerfil}
       <div class="field-full quiz">
         <div class="quiz-progresso" id="quizProg" aria-live="polite"></div>
-        <div class="quiz-corpo">
-          <nav class="quiz-abas" role="tablist" aria-label="Grupos de perguntas">
-            ${gruposUsados
-              .map(
-                (g) => `<button type="button" role="tab" class="quiz-aba ${g === state.quizGrupo ? "active" : ""}" data-quiz-grupo="${g}" style="--g:${g === "socio" ? "#7c2ba8" : "#1e66b2"}" aria-selected="${g === state.quizGrupo}">
-                  <span class="quiz-aba-ico">${ico(g === "socio" ? "felicidade" : "avaliacao")}</span>
-                  <span class="quiz-aba-txt"><b>${R.grupos[g]}</b><small data-aba-prog="${g}"></small></span>
-                  <span class="quiz-aba-check" aria-hidden="true">✓</span>
-                </button>`,
-              )
-              .join("")}
-            ${admin ? `<p class="quiz-abas-dica">${ico("editar")} Você pode editar, incluir ou excluir perguntas aqui mesmo.</p>` : ""}
-          </nav>
-          <div class="quiz-paineis">
-            ${gruposUsados
-              .map(
-                (g) => `<div class="quiz-painel" data-painel="${g}" ${g === state.quizGrupo ? "" : "hidden"}>
-                  ${areas
-                    .filter((a) => a.grupo === g)
-                    .map((a) => {
-                      const qs = perguntas.filter((q) => q.areaId === a.id);
-                      return `<section class="quiz-area" data-grupo="${a.grupo}" data-area-id="${esc(a.id)}">
-                        <header><div><small>${R.grupos[a.grupo]}</small><h3>${esc(a.nome)}</h3></div><span class="quiz-area-soma" data-area-soma="${esc(a.id)}"></span></header>
-                        ${qs.map((q) => pergunta(q, a)).join("")}
-                        ${admin ? `<button type="button" class="quiz-add" data-qe-nova="${esc(a.id)}">+ Adicionar pergunta em “${esc(a.nome)}”</button>` : ""}
-                      </section>`;
-                    })
-                    .join("")}
-                  ${gruposUsados.at(-1) !== g ? `<div class="quiz-proximo"><button type="button" class="btn btn-ghost" data-quiz-grupo="${gruposUsados[gruposUsados.indexOf(g) + 1]}">Ir para ${R.grupos[gruposUsados[gruposUsados.indexOf(g) + 1]]} →</button></div>` : ""}
-                </div>`,
-              )
-              .join("")}
-          </div>
-        </div>
+        ${admin ? `<p class="quiz-abas-dica">${ico("editar")} Você pode editar, incluir ou excluir perguntas aqui mesmo.</p>` : ""}
+        ${gruposUsados
+          .map(
+            (g) => `<div class="quiz-painel" data-painel="${g}">
+              <div class="quiz-grupo-titulo" style="--g:${g === "socio" ? "#7c2ba8" : "#1e66b2"}">
+                <span class="quiz-aba-ico">${ico(g === "socio" ? "felicidade" : "avaliacao")}</span>
+                <span class="quiz-aba-txt"><b>${R.grupos[g]}</b><small data-aba-prog="${g}"></small></span>
+                <span class="quiz-aba-check" aria-hidden="true">✓</span>
+              </div>
+              ${areas
+                .filter((a) => a.grupo === g)
+                .map((a) => {
+                  const qs = perguntas.filter((q) => q.areaId === a.id);
+                  return `<section class="quiz-area" data-grupo="${a.grupo}" data-area-id="${esc(a.id)}">
+                    <header><div><small>${R.grupos[a.grupo]}</small><h3>${esc(a.nome)}</h3></div><span class="quiz-area-soma" data-area-soma="${esc(a.id)}"></span></header>
+                    ${qs.map((q) => pergunta(q, a)).join("")}
+                    ${admin ? `<button type="button" class="quiz-add" data-qe-nova="${esc(a.id)}">+ Adicionar pergunta em “${esc(a.nome)}”</button>` : ""}
+                  </section>`;
+                })
+                .join("")}
+            </div>`,
+          )
+          .join("")}
       </div>
       <label class="field field-full"><span>Mensagem de feedback para o colaborador</span><textarea name="feedback" rows="3" placeholder="O que foi muito bem e o que pode melhorar no período"></textarea></label>
       <label class="field field-full"><span>Merece algum destaque especial? Descreva</span><textarea name="destaque" rows="2"></textarea></label>`;
-  }
-
-  function trocarGrupoQuiz(form, g) {
-    state.quizGrupo = g;
-    $$(".quiz-aba", form).forEach((b) => {
-      b.classList.toggle("active", b.dataset.quizGrupo === g);
-      b.setAttribute("aria-selected", b.dataset.quizGrupo === g);
-    });
-    $$(".quiz-painel", form).forEach((p) => (p.hidden = p.dataset.painel !== g));
-    $(".quiz", form)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function ligarQuestionario(form, tipo, evento) {
     $("#avaliado", form)?.addEventListener("change", (e) => {
       state.pessoaPreSelecionada = e.target.value || null;
       form.dataset.cat = "";
-      state.quizGrupo = null;
       montarFormulario(form, tipo, evento);
     });
     $$("[data-cat]", form).forEach((b) =>
@@ -1136,9 +1113,7 @@
       state.quizTextos = null;
     }
 
-    $$("[data-quiz-grupo]", form).forEach((b) => b.addEventListener("click", () => trocarGrupoQuiz(form, b.dataset.quizGrupo)));
-
-    // Ao responder, marca a pergunta e segue para a próxima sem resposta (troca de aba ao terminar o grupo).
+    // Ao responder, marca a pergunta e desce para a próxima ainda sem resposta (Técnico, depois Socioemocional).
     form.onchange = (e) => {
       if (e.target.type !== "radio") return;
       const q = e.target.closest(".quiz-q");
@@ -1148,11 +1123,9 @@
       q.classList.remove("falta");
       resumoAvaliacao(form);
       if (!primeira) return;
-      const painel = q.closest(".quiz-painel");
-      const proxima = $$(".quiz-q", painel).find((x) => !x.classList.contains("ok"));
-      if (proxima) return proxima.scrollIntoView({ behavior: "smooth", block: "center" });
-      const outra = $$(".quiz-painel", form).find((p) => $$(".quiz-q", p).some((x) => !x.classList.contains("ok")));
-      if (outra) setTimeout(() => trocarGrupoQuiz(form, outra.dataset.painel), 350);
+      const todas = $$(".quiz-q", form);
+      const proxima = todas.slice(todas.indexOf(q) + 1).find((x) => !x.classList.contains("ok")) || todas.find((x) => !x.classList.contains("ok"));
+      (proxima || $('[type="submit"]', form))?.scrollIntoView({ behavior: "smooth", block: "center" });
     };
 
     if (state.usuario.perfil === "admin") ligarEdicaoNoQuiz(form, tipo, evento);
@@ -1256,11 +1229,17 @@
       <div class="quiz-prog-pts"><b>${fmt(total)}</b> <small>/ ${fmt(maximo)} Savacoins</small></div>
       ${selos.length ? `<div class="quiz-selos">${selos.map((s) => `<span>${R.selos.find((x) => x.id === s).nome}</span>`).join("")}</div>` : ""}`;
     $("#quizProg", form).classList.toggle("completo", completo);
+    const enviar = $('[type="submit"]', form);
+    if (enviar) {
+      enviar.disabled = !completo;
+      enviar.title = completo ? "" : `Responda todas as perguntas para registrar (faltam ${perguntas.length - feitas})`;
+      enviar.textContent = completo ? "Registrar avaliação" : `Registrar avaliação · faltam ${perguntas.length - feitas}`;
+    }
     $$("[data-aba-prog]", form).forEach((elAba) => {
       const qs = perguntas.filter((q) => q.grupo === elAba.dataset.abaProg);
       const f = qs.filter((q) => q.id in notas).length;
       elAba.textContent = `${f} de ${qs.length} · ${fmt(qs.reduce((t, q) => t + (notas[q.id] || 0), 0))} pts`;
-      elAba.closest(".quiz-aba").classList.toggle("feito", qs.length > 0 && f === qs.length);
+      elAba.closest(".quiz-grupo-titulo").classList.toggle("feito", qs.length > 0 && f === qs.length);
     });
     $$("[data-area-soma]", form).forEach((elSoma) => {
       const qs = perguntas.filter((q) => q.areaId === elSoma.dataset.areaSoma);
@@ -1497,8 +1476,7 @@
         const faltam = $$(".quiz-q", form).filter((q) => !q.classList.contains("ok"));
         if (faltam.length) {
           faltam.forEach((q) => q.classList.add("falta"));
-          trocarGrupoQuiz(form, faltam[0].closest(".quiz-painel").dataset.painel);
-          setTimeout(() => faltam[0].scrollIntoView({ behavior: "smooth", block: "center" }), 200);
+          faltam[0].scrollIntoView({ behavior: "smooth", block: "center" });
           return (erro.textContent = `Faltam ${faltam.length} pergunta(s) para responder.`);
         }
         dados.area = (fd.get("area") || "").trim();

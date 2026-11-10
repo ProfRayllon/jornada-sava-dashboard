@@ -761,3 +761,12 @@ img { max-width: 100%; }
   .quiz-aba-ico { width: 32px; height: 32px; }
   .quiz-q-admin { opacity: 1; }
 }
+
+/* Questionário corrido: título de cada grupo (Técnico, depois Socioemocional) */
+.quiz-painel + .quiz-painel { margin-top: 10px; }
+.quiz-grupo-titulo { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 14px; background: color-mix(in srgb, var(--g) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--g) 35%, var(--line)); }
+.quiz-grupo-titulo .quiz-aba-ico { background: var(--g); color: #fff; }
+.quiz-grupo-titulo .quiz-aba-txt b { font-size: 1rem; }
+.quiz-grupo-titulo.feito .quiz-aba-check { opacity: 1; transform: none; }
+.quiz-abas-dica { justify-content: center; margin: 0; }
+.form-actions .btn:disabled { opacity: 0.55; cursor: not-allowed; }
