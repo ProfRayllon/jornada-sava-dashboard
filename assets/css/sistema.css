@@ -160,6 +160,12 @@ img { max-width: 100%; }
 .row-actions:has(.icon-btn) { gap: 4px; }
 .btn-sm { min-height: 32px; padding: 6px 12px; font-size: 0.76rem; }
 .ev-nome { display: block; margin-top: 6px; }
+/* Página Lançamentos: abas Eventos/Histórico e tela do evento aberto pelo olho */
+.page-tabs { margin-bottom: 16px; }
+.lanc-voltar { margin-bottom: 14px; }
+#lancFeitos { margin-top: 18px; }
+.ev-linha { cursor: pointer; }
+.ev-linha:hover td { background: var(--soft-2); }
 @media (max-width: 760px) { .field-wide { grid-column: auto; } .score-list { grid-template-columns: 1fr; } }
 /* Foto do colaborador */
 .pessoa-foto { display: block; width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: top; background: var(--soft-2); }

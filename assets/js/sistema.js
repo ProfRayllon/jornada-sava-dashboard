@@ -31,6 +31,8 @@
     indicacao: '<rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M9 7.5V5.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M12 12v2"/>',
     missao: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
     protagonista: '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4L7.5 21l4.5-2.5 4.5 2.5-1.1-7.6"/>',
+    lancamentos: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8.5 15l2.3 2.3 4.7-4.6"/>',
+    ver: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     editar: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
     excluir: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   };
@@ -53,10 +55,10 @@
   const tipos = {
     felicidade: { nome: "Programa de Felicidade", desc: "Presença nos encontros cadastrados (até 2.300 Savacoins no ano).", cor: "#9d2824", icone: ico("felicidade") },
     evento: { nome: "Evento institucional", desc: "Participação nos eventos cadastrados (até 700 Savacoins no ano).", cor: "#3a3c39", icone: ico("evento") },
-    avaliacao: { nome: "Avaliação do líder", desc: "Por ciclo de avaliação: técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
+    avaliacao: { nome: "Avaliação do coordenador", desc: "Por ciclo de avaliação: técnica e socioemocional (ADM) ou competências (ADV).", cor: "#1e66b2", icone: ico("avaliacao") },
     indicacao: { nome: "Indicação de negócio", desc: "Bônus de 500 Savacoins, exclusivo dos advogados.", cor: "#2f7a5b", icone: ico("indicacao") },
     missao: { nome: "Missão secreta", desc: "Missões cadastradas e divulgadas pelo RH.", cor: "#7c2ba8", icone: ico("missao") },
-    protagonista: { nome: "Selo Sou Protagonista", desc: "Indicação do líder por inovação, melhoria ou inspiração.", cor: "#b08a3e", icone: ico("protagonista") },
+    protagonista: { nome: "Selo Sou Protagonista", desc: "Indicação do coordenador por inovação, melhoria ou inspiração.", cor: "#b08a3e", icone: ico("protagonista") },
   };
 
   // Tipos de evento cadastrados na aba Eventos e o valor sugerido por pessoa.
@@ -64,7 +66,7 @@
     felicidade: { nome: "Encontro do Programa de Felicidade", curto: "Encontro", pontos: R.pontosPorEncontroFelicidade },
     evento: { nome: "Evento institucional", curto: "Evento", pontos: 350 },
     missao: { nome: "Missão secreta", curto: "Missão", pontos: 200 },
-    avaliacao: { nome: "Ciclo de avaliação do líder", curto: "Ciclo de avaliação", pontos: null },
+    avaliacao: { nome: "Ciclo de avaliação do coordenador", curto: "Ciclo de avaliação", pontos: null },
   };
 
   const pilares = [
@@ -78,14 +80,12 @@
     visao: { nome: "Visão geral", kicker: "Acompanhamento da Jornada", render: renderVisao },
     painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel },
     apresentacao: { nome: "Apresentação", kicker: "Resultado do ano", render: (el) => window.SAVA_APRESENTACAO.render(el, { ano: state.ano }) },
-    eventos: { nome: "Eventos", kicker: "Encontros, eventos, missões e ciclos", render: renderEventos, perfis: ["admin", "rh"] },
-    lancar: { nome: "Novo lançamento", kicker: "Registrar pontuação", render: renderLancar },
-    historico: { nome: "Lançamentos", kicker: "Histórico do ano", render: renderHistorico },
+    lancamentos: { nome: "Lançamentos", kicker: "Eventos, pontuação e histórico", render: renderLancamentos },
     pessoas: { nome: "Colaboradores", kicker: "Pessoas avaliadas", render: renderPessoas, perfis: ["admin", "rh"] },
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
   };
 
-  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, ev: { tipo: "all" }, atividadeSel: {}, tipoLancamento: null };
+  const state = { usuario: null, ano: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, hist: { tipo: "all", busca: "", todosAnos: true }, ev: { tipo: "all" }, lanc: { aba: "eventos", aberto: null } };
 
   document.addEventListener("DOMContentLoaded", async () => {
     await S.garantirDb();
@@ -93,7 +93,9 @@
     if (!state.usuario) return location.replace("login.html");
     state.ano = S.anoVigente();
 
-    const hash = location.hash.slice(1);
+    let hash = location.hash.slice(1);
+    if (hash === "historico") state.lanc.aba = "historico";
+    if (["eventos", "lancar", "historico"].includes(hash)) hash = "lancamentos";
     if (views[hash] && podeVer(hash)) state.view = hash;
 
     montarShell();
@@ -104,7 +106,7 @@
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
       if (!S.anosDisponiveis().includes(state.ano)) state.ano = S.anoVigente();
-      if (!$("#modal").classList.contains("open") && !["lancar", "painel", "apresentacao"].includes(state.view)) render();
+      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(state.view === "lancamentos" && state.lanc.aberto)) render();
     });
   });
 
@@ -143,6 +145,7 @@
     $("#sideNav").addEventListener("click", (e) => {
       const btn = e.target.closest("[data-view]");
       if (!btn) return;
+      state.lanc.aberto = null;
       irPara(btn.dataset.view);
     });
 
@@ -382,7 +385,10 @@
         $("#rankingCard", el).scrollIntoView({ behavior: "smooth", block: "start" });
       }),
     );
-    $("#irAvaliar", el)?.addEventListener("click", () => irPara("lancar", { tipoLancamento: "avaliacao", pessoaPreSelecionada: null }));
+    $("#irAvaliar", el)?.addEventListener("click", () => {
+      state.ev.tipo = "avaliacao";
+      irPara("lancamentos", { lanc: { aba: "eventos", aberto: null } });
+    });
     const tbody = el.querySelector(".ranking tbody");
     tbody.addEventListener("click", (e) => {
       const tr = e.target.closest("[data-pessoa]");
@@ -567,30 +573,49 @@
     $("#drawer").setAttribute("aria-hidden", "true");
   }
 
-  // ---------------- Lançamentos ----------------
-  function renderLancar(el) {
-    const permitidos = perfis[state.usuario.perfil].tipos;
-    if (!state.tipoLancamento || !permitidos.includes(state.tipoLancamento)) state.tipoLancamento = permitidos[0];
-
+  // ---------------- Lançamentos (eventos + lançar/avaliar + histórico) ----------------
+  // Uma página só: a aba Eventos lista o que foi cadastrado; o olho abre o evento para lançar
+  // pontos ou avaliar; a aba Histórico mostra tudo o que já foi registrado.
+  function renderLancamentos(el) {
+    if (state.lanc.aberto) return renderLancamentoAberto(el);
+    const aba = state.lanc.aba;
     el.innerHTML = `
-      <section class="type-picker">
-        ${permitidos
-          .map(
-            (t) => `<button type="button" class="type-card ${t === state.tipoLancamento ? "active" : ""}" data-tipo="${t}" style="--c:${tipos[t].cor}" aria-pressed="${t === state.tipoLancamento}">
-              <span class="type-icon">${tipos[t].icone}</span><span class="type-check" aria-hidden="true"></span><strong>${tipos[t].nome}</strong><small>${tipos[t].desc}</small></button>`,
-          )
-          .join("")}
-      </section>
-      <form class="card form-card" id="lancForm" novalidate></form>`;
-
-    $$(".type-card", el).forEach((b) =>
+      <div class="seg page-tabs" role="tablist" aria-label="Lançamentos">
+        <button type="button" role="tab" data-aba="eventos" class="${aba === "eventos" ? "active" : ""}" aria-selected="${aba === "eventos"}">Eventos</button>
+        <button type="button" role="tab" data-aba="historico" class="${aba === "historico" ? "active" : ""}" aria-selected="${aba === "historico"}">Histórico</button>
+      </div>
+      <div id="lancCorpo"></div>`;
+    $$("[data-aba]", el).forEach((b) =>
       b.addEventListener("click", () => {
-        state.tipoLancamento = b.dataset.tipo;
-        state.pessoaPreSelecionada = null;
-        renderLancar(el);
+        state.lanc.aba = b.dataset.aba;
+        renderLancamentos(el);
       }),
     );
-    montarFormulario($("#lancForm", el), state.tipoLancamento);
+    (aba === "historico" ? renderHistorico : renderEventos)($("#lancCorpo", el));
+  }
+
+  function abrirLancamento(aberto) {
+    state.lanc.aberto = aberto;
+    render();
+    window.scrollTo({ top: 0 });
+  }
+
+  // Tela de um evento (ou de um lançamento avulso, ex.: indicação): formulário + o que já foi lançado nele.
+  function renderLancamentoAberto(el) {
+    const avulso = state.lanc.aberto.startsWith("avulso:") ? state.lanc.aberto.slice(7) : null;
+    const evento = avulso ? null : S.listarAtividades().find((a) => a.id === state.lanc.aberto);
+    const tipo = avulso || evento?.tipo;
+    if (!tipo || !perfis[state.usuario.perfil].tipos.includes(tipo)) {
+      state.lanc.aberto = null;
+      return renderLancamentos(el);
+    }
+    el.innerHTML = `
+      <div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para lançamentos</button></div>
+      <form class="card form-card" id="lancForm" novalidate></form>
+      ${evento ? `<div id="lancFeitos"></div>` : ""}`;
+    $("#voltarLanc", el).addEventListener("click", () => abrirLancamento(null));
+    montarFormulario($("#lancForm", el), tipo, evento);
+    if (evento) renderHistorico($("#lancFeitos", el), { atividadeId: evento.id });
   }
 
   function pessoasAtivas(categoria) {
@@ -648,12 +673,6 @@
   // Tipos que dependem de um evento cadastrado: a data e o ano vêm dele.
   const TIPOS_COM_EVENTO = ["felicidade", "evento", "missao", "avaliacao"];
 
-  function atividadesDoTipo(tipo) {
-    return S.listarAtividades()
-      .filter((a) => a.tipo === tipo)
-      .sort((a, b) => b.data.localeCompare(a.data));
-  }
-
   // Quem já recebeu pontos num evento (pessoa → Savacoins).
   function pontuadosNaAtividade(id) {
     const mapa = new Map();
@@ -670,20 +689,26 @@
   function renderEventos(el) {
     const ano = state.ano;
     const f = state.ev;
+    const gerencia = podeCadastrarEventos();
+    const permitidos = perfis[state.usuario.perfil].tipos;
+    const tiposVisiveis = Object.keys(tiposAtividade).filter((t) => permitidos.includes(t));
+    const avulsos = permitidos.filter((t) => !TIPOS_COM_EVENTO.includes(t));
+    if (f.tipo !== "all" && !tiposVisiveis.includes(f.tipo)) f.tipo = "all";
     const lista = S.listarAtividades()
-      .filter((a) => a.ano === ano && (f.tipo === "all" || a.tipo === f.tipo))
+      .filter((a) => a.ano === ano && tiposVisiveis.includes(a.tipo) && (f.tipo === "all" || a.tipo === f.tipo))
       .sort((a, b) => a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo));
 
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>Eventos da Jornada ${ano}</h2><p class="muted">Cadastre os encontros, eventos, missões e ciclos de avaliação. Os pontos são lançados a partir deles, já com a data e o ano certos.</p></div>
+          <div><h2>Eventos da Jornada ${ano}</h2><p class="muted">${gerencia ? "Cadastre encontros, eventos, missões e ciclos de avaliação. Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
           <div class="filters">
             ${seletorAno("eAno")}
-            <select id="eTipo" aria-label="Tipo de evento"><option value="all">Todos os tipos</option>${Object.entries(tiposAtividade)
-              .map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`)
-              .join("")}</select>
-            <button class="btn btn-gold" id="novoEvento">+ Novo evento</button>
+            ${tiposVisiveis.length > 1 ? `<select id="eTipo" aria-label="Tipo de evento"><option value="all">Todos os tipos</option>${tiposVisiveis
+              .map((id) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${tiposAtividade[id].nome}</option>`)
+              .join("")}</select>` : ""}
+            ${avulsos.map((t) => `<button class="btn btn-ghost" data-avulso="${t}">+ ${tipos[t].nome}</button>`).join("")}
+            ${gerencia ? `<button class="btn btn-gold" id="novoEvento">+ Novo evento</button>` : ""}
           </div>
         </div>
         <div class="table-wrap">
@@ -693,38 +718,39 @@
               ${lista
                 .map((a) => {
                   const n = pontuadosNaAtividade(a.id).size;
-                  return `<tr>
+                  return `<tr class="ev-linha" data-abrir-linha="${a.id}">
                     <td>${dataBr(a.data)}</td>
                     <td><span class="type-tag" style="--c:${tipos[a.tipo].cor}">${tipos[a.tipo].icone} ${tiposAtividade[a.tipo].curto}</span><strong class="ev-nome">${esc(a.titulo)}</strong>${a.descricao ? `<small>${esc(a.descricao)}</small>` : ""}</td>
-                    <td class="num">${a.pontos ? fmt(a.pontos) : "<small>Notas do líder</small>"}</td>
+                    <td class="num">${a.pontos ? fmt(a.pontos) : "<small>Notas do coordenador</small>"}</td>
                     <td class="num">${fmt(n)}</td>
                     <td><div class="row-actions">
-                      <button class="btn btn-gold btn-sm" data-lancar="${a.id}">${a.tipo === "avaliacao" ? "Avaliar" : "Lançar pontos"}</button>
-                      ${btnEditar("data-editar", a.id)}
-                      ${n ? "" : btnExcluir("data-excluir", a.id)}
+                      ${btnIcone("ver", a.tipo === "avaliacao" ? "Abrir para avaliar" : "Abrir para lançar pontos", "data-abrir", a.id)}
+                      ${gerencia ? btnEditar("data-editar", a.id) : ""}
+                      ${gerencia && !n ? btnExcluir("data-excluir", a.id) : ""}
                     </div></td>
                   </tr>`;
                 })
-                .join("") || `<tr><td colspan="5" class="empty">Nenhum evento cadastrado em ${ano}. Clique em “+ Novo evento”.</td></tr>`}
+                .join("") || `<tr><td colspan="5" class="empty">Nenhum evento em ${ano}.${gerencia ? " Clique em “+ Novo evento”." : ""}</td></tr>`}
             </tbody>
           </table>
         </div>
       </div>`;
 
     ligarSeletorAno(el, "eAno", renderEventos);
-    $("#eTipo", el).addEventListener("change", (e) => {
+    $("#eTipo", el)?.addEventListener("change", (e) => {
       f.tipo = e.target.value;
       renderEventos(el);
     });
-    $("#novoEvento", el).addEventListener("click", () => formAtividade({ tipo: f.tipo !== "all" ? f.tipo : "felicidade" }));
-    $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formAtividade(S.listarAtividades().find((a) => a.id === b.dataset.editar))));
-    $$("[data-lancar]", el).forEach((b) =>
-      b.addEventListener("click", () => {
-        const a = S.listarAtividades().find((x) => x.id === b.dataset.lancar);
-        state.atividadeSel[a.tipo] = a.id;
-        irPara("lancar", { tipoLancamento: a.tipo, pessoaPreSelecionada: null });
+    $("#novoEvento", el)?.addEventListener("click", () => formAtividade({ tipo: f.tipo !== "all" ? f.tipo : "felicidade" }));
+    $$("[data-avulso]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(`avulso:${b.dataset.avulso}`)));
+    $$("[data-abrir]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(b.dataset.abrir)));
+    // A linha inteira também abre o evento (menos os botões de editar/excluir).
+    $$("[data-abrir-linha]", el).forEach((tr) =>
+      tr.addEventListener("click", (e) => {
+        if (!e.target.closest("button")) abrirLancamento(tr.dataset.abrirLinha);
       }),
     );
+    $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formAtividade(S.listarAtividades().find((a) => a.id === b.dataset.editar))));
     $$("[data-excluir]", el).forEach((b) =>
       b.addEventListener("click", async () => {
         const a = S.listarAtividades().find((x) => x.id === b.dataset.excluir);
@@ -786,46 +812,21 @@
         detalhe: (salvo) => `<b>${esc(salvo.titulo)}</b><br>${dataBr(salvo.data)} · Jornada ${salvo.ano}`,
       });
       if (!r.ok) return ($("#atvErro").textContent = r.erro.message);
-      state.atividadeSel[r.resultado.tipo] = r.resultado.id;
       state.ano = r.resultado.ano;
       fecharModal();
       render();
     });
   }
 
-  // Seletor do evento no lançamento, agrupado por ano. A data e o ano vêm do evento.
-  function campoAtividade(tipo) {
-    const lista = atividadesDoTipo(tipo);
-    if (!lista.length) return null;
-    let sel = state.atividadeSel[tipo];
-    if (!lista.some((a) => a.id === sel)) sel = (lista.find((a) => a.ano === state.ano) || lista[0]).id;
-    state.atividadeSel[tipo] = sel;
-    const atual = lista.find((a) => a.id === sel);
-    const anos = [...new Set(lista.map((a) => a.ano))].sort((a, b) => b - a);
+  // Evento do lançamento: fixo (escolhido pelo olho na lista). A data e o ano vêm dele.
+  function campoAtividade(atual) {
     return {
       atual,
       html: `
-        <label class="field field-wide"><span>${tiposAtividade[tipo].curto}</span><select name="atividadeId" id="atividadeSel">
-          ${anos
-            .map(
-              (ano) => `<optgroup label="Jornada ${ano}">${lista
-                .filter((a) => a.ano === ano)
-                .map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${dataBr(a.data)} · ${esc(a.titulo)}</option>`)
-                .join("")}</optgroup>`,
-            )
-            .join("")}
-        </select></label>
+        <input type="hidden" name="atividadeId" value="${esc(atual.id)}" />
+        <div class="field field-wide"><span>${tiposAtividade[atual.tipo].curto}</span><div class="static-value"><b>${esc(atual.titulo)}</b></div></div>
         <div class="field"><span>Data · Jornada</span><div class="static-value">${dataBr(atual.data)} · Jornada ${atual.ano}</div></div>`,
     };
-  }
-
-  function semAtividade(tipo) {
-    const nome = tiposAtividade[tipo].curto.toLowerCase();
-    return `<div class="empty-state field-full">
-      <strong>Nenhum ${nome} cadastrado ainda.</strong>
-      <p class="muted small">Os pontos são lançados a partir de um ${nome} cadastrado na aba Eventos, que já define a data e o ano.</p>
-      ${podeCadastrarEventos() ? `<button type="button" class="btn btn-gold" id="cadastrarAtv">+ Cadastrar ${nome}</button>` : `<p class="muted small">Peça ao RH para cadastrar o ${nome}.</p>`}
-    </div>`;
   }
 
   // Lista de participantes com filtro por área e Savacoins por pessoa (pontuação em lote).
@@ -922,16 +923,12 @@
     </select></label>`;
   }
 
-  function montarFormulario(form, tipo) {
+  function montarFormulario(form, tipo, evento = null) {
     const t = tipos[tipo];
     let corpo = "";
-    let semEnvio = false;
-    const atv = TIPOS_COM_EVENTO.includes(tipo) ? campoAtividade(tipo) : null;
+    const atv = TIPOS_COM_EVENTO.includes(tipo) && evento ? campoAtividade(evento) : null;
 
-    if (TIPOS_COM_EVENTO.includes(tipo) && !atv) {
-      corpo = semAtividade(tipo);
-      semEnvio = true;
-    } else if (["felicidade", "evento", "missao"].includes(tipo)) {
+    if (["felicidade", "evento", "missao"].includes(tipo)) {
       corpo = `${atv.html}${campoParticipantes(atv.atual)}`;
     } else if (tipo === "indicacao") {
       corpo = `${campoData()}${campoPessoa("adv", "Advogado(a)")}
@@ -976,14 +973,8 @@
       <div class="card-head"><div><h2>${t.nome}</h2><p class="muted">${t.desc}</p></div></div>
       <div class="form-grid">${corpo}</div>
       <p class="form-error" id="formError" role="alert"></p>
-      ${semEnvio ? "" : `<div class="form-actions"><button type="submit" class="btn btn-gold">Registrar lançamento</button></div>`}`;
+      <div class="form-actions"><button type="submit" class="btn btn-gold">${tipo === "avaliacao" ? "Registrar avaliação" : "Registrar lançamento"}</button></div>`;
 
-    $("#cadastrarAtv", form)?.addEventListener("click", () => formAtividade({ tipo }));
-    $("#atividadeSel", form)?.addEventListener("change", (e) => {
-      state.atividadeSel[tipo] = e.target.value;
-      state.pessoaPreSelecionada = null;
-      montarFormulario(form, tipo);
-    });
     if ($("#checklist", form)) ligarParticipantes(form);
     ligarData(form);
     if (tipo === "avaliacao" && atv) {
@@ -991,7 +982,7 @@
         b.addEventListener("click", () => {
           form.dataset.cat = b.dataset.cat;
           state.pessoaPreSelecionada = null;
-          montarFormulario(form, tipo);
+          montarFormulario(form, tipo, evento);
         }),
       );
       const atualizar = () => resumoAvaliacao(form);
@@ -1092,18 +1083,21 @@
     if (!r.ok) return (erro.textContent = r.erro.message);
     state.pessoaPreSelecionada = null;
     state.ano = ano;
-    renderLancar($("#content"));
+    render();
   }
 
   // ---------------- Histórico ----------------
-  function renderHistorico(el) {
+  // Com { atividadeId }, mostra só o que foi lançado naquele evento (tela aberta pelo olho), sem filtros.
+  function renderHistorico(el, opcoes = {}) {
     const u = state.usuario;
+    const doEvento = opcoes.atividadeId || null;
     const pessoas = new Map(S.listarPessoas().map((p) => [p.id, p]));
     const todos = S.listarLancamentos()
-      .filter((l) => state.hist.todosAnos || l.ano === state.ano)
+      .filter((l) => (doEvento ? l.atividadeId === doEvento : state.hist.todosAnos || l.ano === state.ano))
       .sort((a, b) => b.data.localeCompare(a.data) || b.criadoEm.localeCompare(a.criadoEm));
     const f = state.hist;
     const lista = todos.filter((l) => {
+      if (doEvento) return true;
       if (f.tipo !== "all" && l.tipo !== f.tipo) return false;
       if (f.busca) {
         const q = S.normalizar(f.busca);
@@ -1116,14 +1110,14 @@
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>${fmt(lista.length)} lançamento(s)</h2><p class="muted">Registros gravados no sistema ${state.hist.todosAnos ? "em todos os anos" : `em ${state.ano}`}.</p></div>
-          <div class="filters">
+          <div><h2>${doEvento ? `Já lançados neste evento · ${fmt(lista.length)}` : `${fmt(lista.length)} lançamento(s)`}</h2><p class="muted">${doEvento ? "Para corrigir um lançamento, exclua e registre de novo." : `Registros gravados no sistema ${state.hist.todosAnos ? "em todos os anos" : `em ${state.ano}`}.`}</p></div>
+          ${doEvento ? "" : `<div class="filters">
             <select id="hAno" class="year-select" aria-label="Ano da Jornada"><option value="all" ${state.hist.todosAnos ? "selected" : ""}>Todos os anos</option>${S.anosDisponiveis()
               .map((a) => `<option value="${a}" ${!state.hist.todosAnos && a === state.ano ? "selected" : ""}>Jornada ${a}</option>`)
               .join("")}</select>
             <input type="search" id="hBusca" placeholder="Pessoa, título ou autor" value="${esc(f.busca)}" />
             <select id="hTipo"><option value="all">Todos os tipos</option>${Object.entries(tipos).map(([id, t]) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${t.nome}</option>`).join("")}</select>
-          </div>
+          </div>`}
         </div>
         <div class="table-wrap">
           <table class="table">
@@ -1149,9 +1143,9 @@
         </div>
       </div>`;
 
-    $("#hBusca", el).addEventListener("change", (e) => ((f.busca = e.target.value), renderHistorico(el)));
-    $("#hTipo", el).addEventListener("change", (e) => ((f.tipo = e.target.value), renderHistorico(el)));
-    $("#hAno", el).addEventListener("change", (e) => {
+    $("#hBusca", el)?.addEventListener("change", (e) => ((f.busca = e.target.value), renderHistorico(el)));
+    $("#hTipo", el)?.addEventListener("change", (e) => ((f.tipo = e.target.value), renderHistorico(el)));
+    $("#hAno", el)?.addEventListener("change", (e) => {
       state.hist.todosAnos = e.target.value === "all";
       if (!state.hist.todosAnos) state.ano = Number(e.target.value);
       renderHistorico(el);
@@ -1168,7 +1162,7 @@
         });
         if (!sim) return;
         const r = await executar(() => S.excluirLancamento(b.dataset.excluir), { carregando: "Excluindo lançamento…", concluido: "Lançamento excluído", detalhe: "Ranking e painel atualizados." });
-        if (r.ok) renderHistorico(el);
+        if (r.ok) render();
       }),
     );
   }
