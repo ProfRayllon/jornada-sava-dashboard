@@ -6,10 +6,18 @@
     return valores.map((valor, i) => ({ valor, rotulo: rotulos[i] }));
   };
 
+  // Perfis (cargos) do cadastro de colaboradores. Só "adm" e "adv" recebem pontuação na Jornada;
+  // os demais existem para organizar a equipe (ex.: coordenador de cada colaborador).
   const categorias = {
+    sistema: "ADM do sistema",
     adm: "Controladoria e Administrativo",
     adv: "Advogados Associados",
+    rh: "RH",
+    coord: "Coordenadores",
   };
+  const categoriasPontuaveis = ["adm", "adv"];
+  // Colaborador sem perfil definido continua na Jornada (aparece como "Definir perfil").
+  const participaDaJornada = (p) => !p?.categoria || categoriasPontuaveis.includes(p.categoria);
 
   // Pontos por critério e opções de nota, conforme as respostas do formulário 2026.
   const criterios = {
@@ -164,6 +172,8 @@
     maxEventosAno: 700,
     pontosIndicacao: 500,
     categorias,
+    categoriasPontuaveis,
+    participaDaJornada,
     criterios,
     pontuacaoBimestral,
     indicadores,

@@ -209,14 +209,23 @@ async function salvarPessoa(req, res) {
     const { rows: todas } = await c.query("SELECT id, nome FROM pessoas");
     if (todas.some((p) => p.id !== id && normalizar(p.nome) === normalizar(nome))) throw new ErroDeUso("Esta pessoa já está cadastrada.");
 
+    // Coordenador (opcional): só para quem pontua, e precisa ser alguém cadastrado como coordenador.
+    let coordenadorId = R.categoriasPontuaveis.includes(b.categoria) && b.coordenadorId ? String(b.coordenadorId) : null;
+    if (coordenadorId) {
+      const { rows: coord } = await c.query("SELECT categoria FROM pessoas WHERE id = $1", [coordenadorId]);
+      if (coordenadorId === id || coord[0]?.categoria !== "coord") throw new ErroDeUso("Escolha um coordenador válido.");
+    }
+
     let r;
     if (id) {
-      r = await c.query("UPDATE pessoas SET nome = $2, categoria = $3, setor = $4, ativo = COALESCE($5, ativo) WHERE id = $1 RETURNING *", [
-        id, nome, b.categoria, texto(b.setor, 120), typeof b.ativo === "boolean" ? b.ativo : null,
+      r = await c.query("UPDATE pessoas SET nome = $2, categoria = $3, setor = $4, ativo = COALESCE($5, ativo), coordenador_id = $6 WHERE id = $1 RETURNING *", [
+        id, nome, b.categoria, texto(b.setor, 120), typeof b.ativo === "boolean" ? b.ativo : null, coordenadorId,
       ]);
       if (!r.rowCount) throw new ErroDeUso("Colaborador não encontrado.", 404);
+      // Quem deixou de ser coordenador não pode continuar como coordenador de ninguém.
+      if (b.categoria !== "coord") await c.query("UPDATE pessoas SET coordenador_id = NULL WHERE coordenador_id = $1", [id]);
     } else {
-      r = await c.query("INSERT INTO pessoas (id, nome, categoria, setor) VALUES ($1, $2, $3, $4) RETURNING *", [uid("p"), nome, b.categoria, texto(b.setor, 120)]);
+      r = await c.query("INSERT INTO pessoas (id, nome, categoria, setor, coordenador_id) VALUES ($1, $2, $3, $4, $5) RETURNING *", [uid("p"), nome, b.categoria, texto(b.setor, 120), coordenadorId]);
     }
     await tocar(c);
     return pessoaDoBanco(r.rows[0]);

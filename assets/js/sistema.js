@@ -31,9 +31,18 @@
     indicacao: '<rect x="3" y="7.5" width="18" height="12.5" rx="2.5"/><path d="M9 7.5V5.5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18M12 12v2"/>',
     missao: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>',
     protagonista: '<circle cx="12" cy="9" r="5.5"/><path d="M8.6 13.4L7.5 21l4.5-2.5 4.5 2.5-1.1-7.6"/>',
+    editar: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
+    excluir: '<path d="M4 7h16M10 11v6M14 11v6"/><path d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   };
   const ico = (nome) =>
     `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONES[nome]}</svg>`;
+  // Botões de ação das tabelas (Editar / Excluir) como ícones, iguais em todas as telas.
+  const btnIcone = (icone, rotulo, atributo, id, perigo = false) =>
+    `<button type="button" class="icon-btn${perigo ? " danger" : ""}" ${atributo}="${esc(id)}" title="${rotulo}" aria-label="${rotulo}">${ico(icone)}</button>`;
+  const btnEditar = (atributo, id) => btnIcone("editar", "Editar", atributo, id);
+  const btnExcluir = (atributo, id) => btnIcone("excluir", "Excluir", atributo, id, true);
+  const tamanhoKb = (bytes) => `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("pt-BR")} KB`;
+  const bytesDoDataUrl = (url) => Math.floor(((url.split(",")[1] || "").length * 3) / 4);
 
   const perfis = {
     admin: { nome: "Administrador", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
@@ -586,7 +595,7 @@
 
   function pessoasAtivas(categoria) {
     return S.listarPessoas()
-      .filter((p) => p.ativo && (!categoria || p.categoria === categoria))
+      .filter((p) => p.ativo && R.participaDaJornada(p) && (!categoria || p.categoria === categoria))
       .sort((a, b) => a.nome.localeCompare(b.nome));
   }
 
@@ -691,8 +700,8 @@
                     <td class="num">${fmt(n)}</td>
                     <td><div class="row-actions">
                       <button class="btn btn-gold btn-sm" data-lancar="${a.id}">${a.tipo === "avaliacao" ? "Avaliar" : "Lançar pontos"}</button>
-                      <button class="link-btn" data-editar="${a.id}">Editar</button>
-                      ${n ? "" : `<button class="link-btn danger" data-excluir="${a.id}">Excluir</button>`}
+                      ${btnEditar("data-editar", a.id)}
+                      ${n ? "" : btnExcluir("data-excluir", a.id)}
                     </div></td>
                   </tr>`;
                 })
@@ -1131,7 +1140,7 @@
                       ${l.feedback ? `<small class="clip">“${esc(l.feedback)}”</small>` : ""}${l.justificativa ? `<small class="clip">${esc(l.justificativa)}</small>` : ""}</td>
                     <td class="num">${l.pontos ? `${fmt(l.pontos)}${l.pessoaIds?.length > 1 ? `<small>por pessoa</small>` : ""}` : "Selo"}</td>
                     <td>${esc(l.autorNome)}<small>${new Date(l.criadoEm).toLocaleString("pt-BR")}</small></td>
-                    <td>${podeExcluir ? `<button class="link-btn danger" data-excluir="${l.id}">Excluir</button>` : ""}</td>
+                    <td><div class="row-actions">${podeExcluir ? btnExcluir("data-excluir", l.id) : ""}</div></td>
                   </tr>`;
                 })
                 .join("") || `<tr><td colspan="6" class="empty">Nenhum lançamento encontrado.</td></tr>`}
@@ -1167,6 +1176,7 @@
   // ---------------- Pessoas ----------------
   function renderPessoas(el) {
     const lista = S.listarPessoas().sort((a, b) => Number(b.ativo) - Number(a.ativo) || a.nome.localeCompare(b.nome));
+    const porId = new Map(lista.map((p) => [p.id, p]));
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
@@ -1182,11 +1192,11 @@
                   (p) => `<tr class="${p.ativo ? "" : "inactive"}">
                   <td>${S.fotoUrl(p) ? `<img class="pessoa-foto" src="${S.fotoUrl(p)}" alt="" loading="lazy" />` : `<span class="avatar sm">${esc(iniciais(p.nome))}</span>`}</td>
                   <td><strong>${esc(nomeBonito(p.nome))}</strong></td>
-                  <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}</td>
+                  <td>${R.categorias[p.categoria] || `<span class="warn">Definir perfil</span>`}${porId.get(p.coordenadorId) ? `<small>Coord.: ${esc(nomeBonito(porId.get(p.coordenadorId).nome))}</small>` : ""}</td>
                   <td>${esc(p.setor || "—")}</td>
                   <td>${p.origem === "base" ? "Planilha 2026" : "Sistema"}</td>
                   <td><span class="status ${p.ativo ? "on" : ""}">${p.ativo ? "Ativo" : "Inativo"}</span></td>
-                  <td><div class="row-actions"><button class="link-btn" data-editar="${p.id}">Editar</button>${state.usuario.perfil === "admin" ? `<button class="link-btn danger" data-excluir-pessoa="${p.id}">Excluir</button>` : ""}</div></td>
+                  <td><div class="row-actions">${btnEditar("data-editar", p.id)}${state.usuario.perfil === "admin" ? btnExcluir("data-excluir-pessoa", p.id) : ""}</div></td>
                 </tr>`,
                 )
                 .join("")}
@@ -1223,25 +1233,36 @@
   const prepararFoto = (arquivo) => S.prepararFoto(arquivo);
 
   function formPessoa(p = {}) {
+    const coordenadores = S.listarPessoas()
+      .filter((c) => c.categoria === "coord" && c.id !== p.id && (c.ativo || c.id === p.coordenadorId))
+      .sort((a, b) => a.nome.localeCompare(b.nome));
+    const temCoordenador = (cat) => R.categoriasPontuaveis.includes(cat);
     abrirModal(
       p.id ? "Editar colaborador" : "Novo colaborador",
       `<form class="form-grid" id="pessoaForm" novalidate>
+        <div class="field field-full"><span>Foto (aparece na apresentação do resultado)</span>
+          <div class="foto-linha">
+            <div class="foto-prev" id="fotoPrev">${S.fotoUrl(p) ? `<img src="${S.fotoUrl(p)}" alt="" />` : `<b>${esc(iniciais(p.nome || "?"))}</b>`}</div>
+            <div class="foto-acoes">
+              <div class="foto-botoes">
+                <label class="btn btn-ghost btn-sm">${S.fotoUrl(p) ? "Trocar foto" : "Escolher foto"}<input type="file" id="fotoArq" accept="image/png,image/webp,image/jpeg" hidden /></label>
+                <button type="button" class="link-btn danger" id="fotoRemover" ${S.fotoUrl(p) ? "" : "hidden"}>Remover foto</button>
+              </div>
+              <small class="foto-tamanho" id="fotoTamanho"></small>
+              <small class="muted">De preferência PNG com fundo transparente. A imagem é reduzida automaticamente antes de enviar.</small>
+            </div>
+          </div>
+        </div>
         <label class="field field-full"><span>Nome completo</span><input name="nome" required value="${esc(p.nome ? nomeBonito(p.nome) : "")}" /></label>
         <label class="field"><span>Perfil</span><select name="categoria" required>
           <option value="">Selecione…</option>
           ${Object.entries(R.categorias).map(([id, n]) => `<option value="${id}" ${p.categoria === id ? "selected" : ""}>${n}</option>`).join("")}
         </select></label>
         <label class="field"><span>Setor / área de atuação</span><input name="setor" value="${esc(p.setor || "")}" /></label>
-        <div class="field field-full"><span>Foto (aparece na apresentação do resultado)</span>
-          <div class="foto-linha">
-            <div class="foto-prev" id="fotoPrev">${S.fotoUrl(p) ? `<img src="${S.fotoUrl(p)}" alt="" />` : `<b>${esc(iniciais(p.nome || "?"))}</b>`}</div>
-            <div class="foto-acoes">
-              <label class="btn btn-ghost btn-sm">Escolher foto<input type="file" id="fotoArq" accept="image/png,image/webp,image/jpeg" hidden /></label>
-              <button type="button" class="link-btn danger" id="fotoRemover" ${S.fotoUrl(p) ? "" : "hidden"}>Remover foto</button>
-              <small class="muted">De preferência PNG com fundo transparente. A imagem é reduzida automaticamente antes de enviar.</small>
-            </div>
-          </div>
-        </div>
+        <label class="field field-full" id="campoCoord" ${temCoordenador(p.categoria) ? "" : "hidden"}><span>Coordenador (opcional)</span><select name="coordenadorId">
+          <option value="">Sem coordenador</option>
+          ${coordenadores.map((c) => `<option value="${esc(c.id)}" ${p.coordenadorId === c.id ? "selected" : ""}>${esc(nomeBonito(c.nome))}${c.ativo ? "" : " (inativo)"}</option>`).join("")}
+        </select>${coordenadores.length ? "" : `<small class="muted">Nenhum coordenador cadastrado ainda. Cadastre um colaborador com o perfil “Coordenadores”.</small>`}</label>
         ${p.id ? `<label class="check-line field-full"><input type="checkbox" name="ativo" ${p.ativo ? "checked" : ""} /> Participa da jornada (ativo)</label>` : ""}
         <p class="form-error field-full" id="pfErro"></p>
         <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Salvar</button></div>
@@ -1249,6 +1270,17 @@
     );
     let novaFoto = null;
     let tirarFoto = false;
+    const mostrarTamanho = (texto) => ($("#fotoTamanho").textContent = texto || "");
+    // Tamanho da foto já salva (o navegador reaproveita a imagem em cache).
+    if (S.fotoUrl(p)) {
+      fetch(S.fotoUrl(p), { credentials: "same-origin" })
+        .then((r) => (r.ok ? r.blob() : null))
+        .then((b) => b && !novaFoto && !tirarFoto && mostrarTamanho(`Foto atual: ${tamanhoKb(b.size)}`))
+        .catch(() => {});
+    }
+    $("#pessoaForm [name=categoria]").addEventListener("change", (e) => {
+      $("#campoCoord").hidden = !temCoordenador(e.target.value);
+    });
     $("#fotoArq").addEventListener("change", async (e) => {
       const arquivo = e.target.files?.[0];
       if (!arquivo) return;
@@ -1260,12 +1292,14 @@
       tirarFoto = false;
       $("#fotoPrev").innerHTML = `<img src="${novaFoto}" alt="" />`;
       $("#fotoRemover").hidden = false;
+      mostrarTamanho(`Original: ${tamanhoKb(arquivo.size)} → reduzida: ${tamanhoKb(bytesDoDataUrl(novaFoto))}`);
     });
     $("#fotoRemover").addEventListener("click", () => {
       novaFoto = null;
       tirarFoto = true;
       $("#fotoPrev").innerHTML = `<b>${esc(iniciais(p.nome || "?"))}</b>`;
       $("#fotoRemover").hidden = true;
+      mostrarTamanho("");
     });
     $("#pessoaForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1273,7 +1307,9 @@
       if (!fd.get("nome").trim() || !fd.get("categoria")) return ($("#pfErro").textContent = "Preencha nome e perfil.");
       const r = await executar(
         async () => {
-          const salvo = await S.salvarPessoa({ id: p.id, nome: fd.get("nome"), categoria: fd.get("categoria"), setor: fd.get("setor"), ativo: p.id ? fd.get("ativo") === "on" : true });
+          const categoria = fd.get("categoria");
+          const coordenadorId = temCoordenador(categoria) ? fd.get("coordenadorId") || null : null;
+          const salvo = await S.salvarPessoa({ id: p.id, nome: fd.get("nome"), categoria, setor: fd.get("setor"), coordenadorId, ativo: p.id ? fd.get("ativo") === "on" : true });
           if (novaFoto) await S.salvarFoto(salvo.id, novaFoto);
           else if (tirarFoto && p.id) await S.removerFoto(p.id);
           return salvo;
@@ -1312,7 +1348,7 @@
                   <td>${perfis[u.perfil]?.nome || u.perfil}</td>
                   <td>${esc(u.area || "—")}</td>
                   <td><span class="status ${u.ativo ? "on" : ""}">${u.ativo ? "Ativo" : "Bloqueado"}</span></td>
-                  <td><button class="link-btn" data-editar="${u.id}">Editar</button></td>
+                  <td><div class="row-actions">${btnEditar("data-editar", u.id)}</div></td>
                 </tr>`,
                 )
                 .join("")}

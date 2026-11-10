@@ -118,6 +118,7 @@ const pessoaDoBanco = (r) => ({
   chaveBase: r.chave_base,
   categoria: r.categoria,
   setor: r.setor,
+  coordenadorId: r.coordenador_id || null,
   ativo: r.ativo,
   origem: r.origem,
   criadoEm: r.criado_em,

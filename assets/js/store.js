@@ -339,7 +339,7 @@
     }
 
     return pessoas
-      .filter((p) => p.ativo)
+      .filter((p) => p.ativo && R.participaDaJornada(p))
       .map((pessoa) => {
         const b = basePorChave.get(pessoa.chaveBase);
         const linha = {
