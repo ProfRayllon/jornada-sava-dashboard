@@ -1236,7 +1236,8 @@
     const coordenadores = S.listarPessoas()
       .filter((c) => c.categoria === "coord" && c.id !== p.id && (c.ativo || c.id === p.coordenadorId))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-    const temCoordenador = (cat) => R.categoriasPontuaveis.includes(cat);
+    // O campo só aparece quando já existe algum coordenador para escolher.
+    const temCoordenador = (cat) => coordenadores.length > 0 && R.categoriasPontuaveis.includes(cat);
     abrirModal(
       p.id ? "Editar colaborador" : "Novo colaborador",
       `<form class="form-grid" id="pessoaForm" novalidate>
@@ -1256,13 +1257,13 @@
         <label class="field field-full"><span>Nome completo</span><input name="nome" required value="${esc(p.nome ? nomeBonito(p.nome) : "")}" /></label>
         <label class="field"><span>Perfil</span><select name="categoria" required>
           <option value="">Selecione…</option>
-          ${Object.entries(R.categorias).map(([id, n]) => `<option value="${id}" ${p.categoria === id ? "selected" : ""}>${n}</option>`).join("")}
+          ${Object.entries(R.categorias).filter(([id]) => R.categoriasPontuaveis.includes(id) || p.categoria === id).map(([id, n]) => `<option value="${id}" ${p.categoria === id ? "selected" : ""}>${n}</option>`).join("")}
         </select></label>
         <label class="field"><span>Setor / área de atuação</span><input name="setor" value="${esc(p.setor || "")}" /></label>
         <label class="field field-full" id="campoCoord" ${temCoordenador(p.categoria) ? "" : "hidden"}><span>Coordenador (opcional)</span><select name="coordenadorId">
           <option value="">Sem coordenador</option>
           ${coordenadores.map((c) => `<option value="${esc(c.id)}" ${p.coordenadorId === c.id ? "selected" : ""}>${esc(nomeBonito(c.nome))}${c.ativo ? "" : " (inativo)"}</option>`).join("")}
-        </select>${coordenadores.length ? "" : `<small class="muted">Nenhum coordenador cadastrado ainda. Cadastre um colaborador com o perfil “Coordenadores”.</small>`}</label>
+        </select></label>
         ${p.id ? `<label class="check-line field-full"><input type="checkbox" name="ativo" ${p.ativo ? "checked" : ""} /> Participa da jornada (ativo)</label>` : ""}
         <p class="form-error field-full" id="pfErro"></p>
         <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Salvar</button></div>
