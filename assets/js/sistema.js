@@ -2557,8 +2557,35 @@
   }
 
   // ---------------- Equipe ----------------
+  // Quem cada login avalia: a equipe do coordenador; o RH fica com quem está sem coordenador.
+  function avaliadosDe(u) {
+    const ativos = pessoasAtivas().filter((p) => R.categoriasPontuaveis.includes(p.categoria));
+    if (u.perfil === "lider") return ativos.filter((p) => p.coordenadorId === u.id);
+    if (u.perfil === "rh") return ativos.filter((p) => !p.coordenadorId);
+    return null;
+  }
+
+  function abrirAvaliadosDe(u) {
+    const lista = avaliadosDe(u) || [];
+    const periodo = periodosAvaliacao()[0];
+    const feitos = periodo ? pontuadosNaAtividade(periodo.id) : new Map();
+    abrirModal(
+      `${u.perfil === "rh" ? "Sem coordenador" : "Equipe de"} · ${esc(u.nome)}`,
+      `<p class="muted small">${fmt(lista.length)} colaborador(es)${periodo ? ` · ${fmt(lista.filter((p) => feitos.has(p.id)).length)} avaliado(s) em “${esc(periodo.titulo)}”` : ""}. A equipe é definida em Colaboradores (campo Coordenador) ou pela importação da planilha.</p>
+      <div class="avaliados-lista">${lista
+        .map((p) => `<div class="avaliados-item">${S.fotoUrl(p) ? `<img class="pessoa-foto" src="${S.fotoUrl(p)}" alt="" />` : `<span class="avatar sm">${esc(iniciais(p.nome))}</span>`}
+          <span><b>${esc(nomeBonito(p.nome))}</b><small>${R.categorias[p.categoria]}</small></span>
+          ${periodo ? `<span class="status ${feitos.has(p.id) ? "on" : ""}">${feitos.has(p.id) ? "Avaliado" : "Pendente"}</span>` : ""}</div>`)
+        .join("") || `<p class="muted">Nenhum colaborador ligado a este login.</p>`}</div>
+      <div class="form-actions"><button class="btn btn-gold" type="button" data-close>Fechar</button></div>`,
+    );
+  }
+
   function renderEquipe(el) {
     const lista = S.listarUsuarios();
+    const pontuaveis = pessoasAtivas().filter((p) => R.categoriasPontuaveis.includes(p.categoria));
+    const lideres = new Set(lista.filter((u) => u.perfil === "lider").map((u) => u.id));
+    const comCoord = pontuaveis.filter((p) => lideres.has(p.coordenadorId)).length;
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
@@ -2570,9 +2597,15 @@
           <div><b>RH</b><small>Presenças, eventos, missões, indicações, avaliações e cadastro de colaboradores.</small></div>
           <div><b>Coordenador</b><small>Avaliações dos colaboradores ao longo do ano.</small></div>
         </div>
+        <div class="equipe-resumo">
+          <div><b>${fmt(pontuaveis.length)}</b><small>colaboradores na Jornada</small></div>
+          <div><b>${fmt(comCoord)}</b><small>com coordenador</small></div>
+          <div class="${pontuaveis.length - comCoord ? "alerta" : ""}"><b>${fmt(pontuaveis.length - comCoord)}</b><small>sem coordenador</small></div>
+          <div><b>${fmt(lideres.size)}</b><small>coordenadores</small></div>
+        </div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Área</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th class="num">Avaliados</th><th>Área</th><th>Status</th><th></th></tr></thead>
             <tbody>
               ${lista
                 .map(
@@ -2580,6 +2613,11 @@
                   <td><span class="avatar sm">${esc(iniciais(u.nome))}</span><strong>${esc(u.nome)}</strong></td>
                   <td>${esc(u.email)}</td>
                   <td>${perfis[u.perfil]?.nome || u.perfil}</td>
+                  <td class="num">${(() => {
+                    const av = avaliadosDe(u);
+                    if (!av) return "—";
+                    return `<button type="button" class="avaliados-n ${av.length ? "" : "zero"}" data-avaliados="${esc(u.id)}" title="Ver quem ${esc(u.nome)} avalia">${fmt(av.length)}${u.perfil === "rh" ? " <small>sem coord.</small>" : ""}</button>`;
+                  })()}</td>
                   <td>${esc(u.area || "—")}</td>
                   <td><span class="status ${u.ativo ? "on" : ""}">${u.ativo ? "Ativo" : "Bloqueado"}</span></td>
                   <td><div class="row-actions">${btnEditar("data-editar", u.id)}</div></td>
@@ -2591,6 +2629,7 @@
         </div>
       </div>`;
     $("#novoUsuario", el).addEventListener("click", () => formUsuario());
+    $$("[data-avaliados]", el).forEach((b) => b.addEventListener("click", () => abrirAvaliadosDe(lista.find((u) => u.id === b.dataset.avaliados))));
     $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formUsuario(lista.find((u) => u.id === b.dataset.editar))));
   }
 
