@@ -911,6 +911,15 @@
     av.passo = Math.min(av.passo, passos.length - 1);
     const p = passos[av.passo];
     const nota = (pid, qid) => av.notas[pid]?.[qid];
+    // Savacoins somados até agora e o máximo possível no questionário da pessoa.
+    const soma = (x) => {
+      const qs = perguntasAvaliacao(x.categoria);
+      return { total: qs.reduce((t, q) => t + (nota(x.id, q.id) || 0), 0), max: qs.reduce((t, q) => t + q.max, 0) };
+    };
+    const placar = (x, classe = "") => {
+      const { total, max } = soma(x);
+      return `<span class="fm-placar ${classe}" title="Savacoins somados até agora"><b>${fmt(total)}</b> / ${fmt(max)} Savacoins</span>`;
+    };
     const completo = p.tipo !== "q" || p.pessoas.every((x) => nota(x.id, p.q.id) != null);
     const pct = Math.round((av.passo / (passos.length - 1)) * 100);
     const voltar = `<button type="button" class="btn-voltar" id="fmAnterior">${av.passo ? "← Anterior" : "← Sair"}</button>`;
@@ -919,20 +928,20 @@
     if (p.tipo === "q") {
       const opcoes = (pid) =>
         p.q.valores
-          .map((v, nivel) => `<button type="button" class="fm-opcao nivel-${nivel} ${nota(pid, p.q.id) === v ? "sel" : ""}" data-nota="${v}" data-p="${esc(pid)}"><i aria-hidden="true"></i><span>${R.rotulosNota[nivel]}</span></button>`)
+          .map((v, nivel) => `<button type="button" class="fm-opcao nivel-${nivel} ${nota(pid, p.q.id) === v ? "sel" : ""}" data-nota="${v}" data-p="${esc(pid)}"><i aria-hidden="true"></i><span>${R.rotulosNota[nivel]}</span><em>+${fmt(v)}</em></button>`)
           .join("");
       corpo = `
         <p class="fm-secao">${SECOES_AVALIACAO[p.cat]} · Pergunta ${p.n} de ${p.total}</p>
         <h1 class="fm-pergunta">${esc(p.q.texto)}</h1>
         ${p.q.descricao ? `<p class="fm-descricao">${esc(p.q.descricao)}</p>` : ""}
         ${p.pessoas.length === 1
-          ? `<div class="fm-avaliado">${fotoOuIniciais(p.pessoas[0], "sm")}<b>${esc(nomeBonito(p.pessoas[0].nome))}</b></div>
+          ? `<div class="fm-avaliado">${fotoOuIniciais(p.pessoas[0], "sm")}<b>${esc(nomeBonito(p.pessoas[0].nome))}</b>${placar(p.pessoas[0])}</div>
              <div class="fm-opcoes grande">${opcoes(p.pessoas[0].id)}</div>`
           : `<div class="fm-todos"><span>Mesma resposta para todos:</span><div class="fm-opcoes mini">${p.q.valores
-              .map((v, nivel) => `<button type="button" class="fm-opcao nivel-${nivel}" data-todos="${v}"><i aria-hidden="true"></i><span>${R.rotulosNota[nivel]}</span></button>`)
+              .map((v, nivel) => `<button type="button" class="fm-opcao nivel-${nivel}" data-todos="${v}"><i aria-hidden="true"></i><span>${R.rotulosNota[nivel]}</span><em>+${fmt(v)}</em></button>`)
               .join("")}</div></div>
              <div class="fm-linhas">${p.pessoas
-               .map((x) => `<div class="fm-linha ${nota(x.id, p.q.id) != null ? "ok" : ""}"><div class="fm-linha-quem">${fotoOuIniciais(x, "sm")}<b>${esc(nomeBonito(x.nome))}</b></div><div class="fm-opcoes">${opcoes(x.id)}</div></div>`)
+               .map((x) => `<div class="fm-linha ${nota(x.id, p.q.id) != null ? "ok" : ""}"><div class="fm-linha-quem">${fotoOuIniciais(x, "sm")}<span><b>${esc(nomeBonito(x.nome))}</b>${placar(x, "mini")}</span></div><div class="fm-opcoes">${opcoes(x.id)}</div></div>`)
                .join("")}</div>`}`;
     } else if (p.tipo === "texto") {
       corpo = `
@@ -950,7 +959,7 @@
           .map((x) => {
             const qs = perguntasAvaliacao(x.categoria);
             const respondidas = qs.filter((q) => nota(x.id, q.id) != null).length;
-            return `<div class="fm-rev-item">${fotoOuIniciais(x, "sm")}<div><b>${esc(nomeBonito(x.nome))}</b><small>${respondidas} de ${qs.length} perguntas · ${av.feedback[x.id] ? "com feedback" : "sem feedback"}${av.destaque[x.id] ? " · com destaque" : ""}</small></div><span class="fm-rev-ok">${respondidas === qs.length ? "✓" : "!"}</span></div>`;
+            return `<div class="fm-rev-item">${fotoOuIniciais(x, "sm")}<div><b>${esc(nomeBonito(x.nome))}</b><small>${respondidas} de ${qs.length} perguntas · ${av.feedback[x.id] ? "com feedback" : "sem feedback"}${av.destaque[x.id] ? " · com destaque" : ""}</small></div>${placar(x)}<span class="fm-rev-ok">${respondidas === qs.length ? "✓" : "!"}</span></div>`;
           })
           .join("")}</div>`;
     }
@@ -983,8 +992,13 @@
     $$("[data-nota]", el).forEach((b) =>
       b.addEventListener("click", () => {
         (av.notas[b.dataset.p] ||= {})[p.q.id] = Number(b.dataset.nota);
-        // Uma pessoa só: ao escolher, já passa para a próxima pergunta.
-        if (p.pessoas.length === 1) return setTimeout(() => ir(av.passo + 1), 220);
+        // Uma pessoa só: marca, mostra a soma nova e já passa para a próxima pergunta.
+        if (p.pessoas.length === 1) {
+          $$("[data-nota]", el).forEach((x) => x.classList.toggle("sel", x === b));
+          $(".fm-avaliado .fm-placar", el).outerHTML = placar(p.pessoas[0]);
+          $(".fm-avaliado .fm-placar", el).classList.add("pulou");
+          return setTimeout(() => ir(av.passo + 1), 550);
+        }
         renderAssistente(el);
       }),
     );
