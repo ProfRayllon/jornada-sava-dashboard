@@ -808,3 +808,8 @@ body.modo-form .sidebar, body.modo-form .topbar { display: none; }
   .form-topo-user > div:not(.form-topo-acoes) { display: none; }
   .form-topo-acoes { margin-left: 0; }
 }
+
+/* Apresentação: faixa do topo escura, no tom do palco. */
+body.topo-escuro .topbar { background: #0c0b09; border-bottom-color: rgba(212, 178, 111, 0.18); }
+body.topo-escuro .topbar h1 { color: #f3efe6; }
+body.topo-escuro .menu-btn { color: #f3efe6; }

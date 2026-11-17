@@ -114,6 +114,9 @@
       <section class="apre apre-inicio">
         ${fundo()}
         <div class="apre-inicio-box">
+          <button type="button" class="apre-tela-cheia" id="apreIniciarCheia" title="Iniciar em tela cheia" aria-label="Iniciar em tela cheia">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+          </button>
           <img class="apre-simbolo-sm" src="assets/logo/sava-simbolo.png" alt="" />
           <p class="apre-kicker">Apresentação do resultado</p>
           <h2>Jornada SAVA</h2>
@@ -124,9 +127,8 @@
           <p class="apre-resumo">${d.pontuados ? `${fmt(d.pessoas)} colaboradores · ${fmt(d.total)} Savacoins · ${fmt(d.totalSelos)} selos` : "Este ciclo ainda não tem pontuação."}</p>
           <div class="apre-acoes">
             <button type="button" class="apre-btn apre-btn-ouro" id="apreIniciar">Iniciar apresentação</button>
-            <button type="button" class="apre-btn" id="apreIniciarCheia">Iniciar em tela cheia</button>
+            ${abrirPainel ? `<button type="button" class="apre-btn" id="apreVerPainel">Ver painel da Jornada</button>` : ""}
           </div>
-          ${abrirPainel ? `<button type="button" class="apre-btn apre-btn-painel" id="apreVerPainel">Ver painel da Jornada</button>` : ""}
         </div>
         ${rodape()}
       </section>`;

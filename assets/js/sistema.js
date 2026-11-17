@@ -213,6 +213,7 @@
     $("#viewKicker").textContent = v.kicker;
     $$("#sideNav [data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === (v.menu || state.view)));
     $("#content").classList.toggle("content-full", ["painel", "apresentacao"].includes(state.view));
+    document.body.classList.toggle("topo-escuro", state.view === "apresentacao");
     v.render($("#content"));
   }
 
