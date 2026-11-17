@@ -929,28 +929,23 @@
 
   function renderEventos(el) {
     const ciclo = cicloAtual();
-    const f = state.ev;
     const gerencia = podeCadastrarEventos();
     const permitidos = perfis[state.usuario.perfil].tipos;
     const tiposVisiveis = Object.keys(tiposAtividade).filter((t) => permitidos.includes(t));
     const avulsos = permitidos.filter((t) => !TIPOS_COM_EVENTO.includes(t));
-    if (f.tipo !== "all" && !tiposVisiveis.includes(f.tipo)) f.tipo = "all";
     const lista = S.listarAtividades()
-      .filter((a) => noCiclo(ciclo, a.data) && tiposVisiveis.includes(a.tipo) && (f.tipo === "all" || a.tipo === f.tipo))
+      .filter((a) => noCiclo(ciclo, a.data) && tiposVisiveis.includes(a.tipo))
       .sort((a, b) => a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo));
 
     el.innerHTML = `
       <div class="card">
         <div class="card-head">
-          <div><h2>Eventos · ${esc(ciclo?.nome || "sem ciclo")}</h2><p class="muted">${gerencia ? "Cadastre encontros, eventos, missões e ciclos de avaliação. Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
+          <div><h2>Eventos · ${esc(ciclo?.nome || "sem ciclo")}</h2><p class="muted">${gerencia ? "Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
           <div class="filters">
             ${seletorCiclo("eAno")}
-            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="eCiclos">${ico("eventos")} Ciclos</button><button class="btn btn-ghost" id="eNovoCiclo">+ Novo ciclo</button>` : ""}
-            ${tiposVisiveis.length > 1 ? `<select id="eTipo" aria-label="Tipo de evento"><option value="all">Todos os tipos</option>${tiposVisiveis
-              .map((id) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${tiposAtividade[id].nome}</option>`)
-              .join("")}</select>` : ""}
             ${avulsos.map((t) => `<button class="btn btn-ghost" data-avulso="${t}">+ ${tipos[t].nome}</button>`).join("")}
             ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="abrirModelo">${ico("avaliacao")} Modelo de avaliação</button>` : ""}
+            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="eNovoCiclo">+ Novo ciclo</button>` : ""}
             ${gerencia ? `<button class="btn btn-gold" id="novoEvento">+ Novo evento</button>` : ""}
           </div>
         </div>
@@ -980,13 +975,8 @@
       </div>`;
 
     ligarSeletorCiclo(el, "eAno", renderEventos);
-    $("#eCiclos", el)?.addEventListener("click", abrirCiclos);
     $("#eNovoCiclo", el)?.addEventListener("click", () => formCiclo());
-    $("#eTipo", el)?.addEventListener("change", (e) => {
-      f.tipo = e.target.value;
-      renderEventos(el);
-    });
-    $("#novoEvento", el)?.addEventListener("click", () => formAtividade({ tipo: f.tipo !== "all" ? f.tipo : "felicidade" }));
+    $("#novoEvento", el)?.addEventListener("click", () => formAtividade({ tipo: "felicidade" }));
     $$("[data-avulso]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(`avulso:${b.dataset.avulso}`)));
     $("#abrirModelo", el)?.addEventListener("click", () => abrirLancamento("modelo"));
     $$("[data-abrir]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(b.dataset.abrir)));
