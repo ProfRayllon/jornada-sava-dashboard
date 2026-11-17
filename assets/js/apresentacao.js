@@ -96,8 +96,11 @@
   }
 
   // ---------- Estrutura ----------
+  let abrirPainel = null;
+
   function render(el, ctx = {}) {
     raiz = el;
+    abrirPainel = ctx.abrirPainel || null;
     if (!S.cicloPorId(st.ciclo)) st.ciclo = ctx.ciclo || S.cicloVigente()?.id;
     ligarTeclas();
     if (st.cena < 0) return renderInicio();
@@ -123,6 +126,7 @@
             <button type="button" class="apre-btn apre-btn-ouro" id="apreIniciar">Iniciar apresentação</button>
             <button type="button" class="apre-btn" id="apreIniciarCheia">Iniciar em tela cheia</button>
           </div>
+          ${abrirPainel ? `<button type="button" class="apre-btn apre-btn-painel" id="apreVerPainel">Ver painel da Jornada</button>` : ""}
         </div>
         ${rodape()}
       </section>`;
@@ -131,6 +135,7 @@
       renderInicio();
     });
     $("#apreIniciar", raiz).addEventListener("click", () => irCena(0));
+    $("#apreVerPainel", raiz)?.addEventListener("click", () => abrirPainel(st.ciclo));
     $("#apreIniciarCheia", raiz).addEventListener("click", () => {
       irCena(0);
       telaCheia(true);

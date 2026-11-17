@@ -79,8 +79,13 @@
 
   const views = {
     visao: { nome: "Visão geral", kicker: "Acompanhamento da Jornada", render: renderVisao },
-    painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel },
-    apresentacao: { nome: "Apresentação", kicker: "Resultado do ciclo", render: (el) => window.SAVA_APRESENTACAO.render(el, { ciclo: state.ciclo }) },
+    // O painel não fica no menu: abre pelo botão "Ver painel da Jornada" da Apresentação.
+    painel: { nome: "Painel da Jornada", kicker: "Ranking, destaque e selos ao vivo", render: renderPainel, menu: "apresentacao" },
+    apresentacao: {
+      nome: "Apresentação",
+      kicker: "Resultado do ciclo",
+      render: (el) => window.SAVA_APRESENTACAO.render(el, { ciclo: state.ciclo, abrirPainel: (id) => irPara("painel", { ciclo: id || state.ciclo }) }),
+    },
     lancamentos: { nome: "Lançamentos", kicker: "Eventos, pontuação e histórico", render: renderLancamentos },
     pessoas: { nome: "Colaboradores", kicker: "Pessoas avaliadas", render: renderPessoas, perfis: ["admin", "rh"] },
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
@@ -123,7 +128,7 @@
       <div class="side-label"><strong>${esc(u.nome)}</strong><small>${perfis[u.perfil].nome}</small></div>`;
 
     $("#sideNav").innerHTML = Object.entries(views)
-      .filter(([id]) => podeVer(id))
+      .filter(([id, v]) => podeVer(id) && !v.menu)
       .map(([id, v]) => `<button type="button" data-view="${id}" title="${v.nome}">${ico(id)}<span class="side-label">${v.nome}</span></button>`)
       .join("");
 
@@ -199,7 +204,7 @@
     const v = views[state.view];
     $("#viewTitle").textContent = v.nome;
     $("#viewKicker").textContent = v.kicker;
-    $$("#sideNav [data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === state.view));
+    $$("#sideNav [data-view]").forEach((b) => b.classList.toggle("active", b.dataset.view === (v.menu || state.view)));
     $("#content").classList.toggle("content-full", ["painel", "apresentacao"].includes(state.view));
     v.render($("#content"));
   }

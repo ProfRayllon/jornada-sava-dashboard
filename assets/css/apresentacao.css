@@ -233,6 +233,7 @@
 .apre-btn:hover { transform: translateY(-1px); background: rgba(212, 178, 111, 0.14); }
 .apre-btn-ouro { border-color: transparent; background: linear-gradient(120deg, var(--ap-gold-hi), var(--ap-gold) 55%, var(--ap-gold-deep)); color: #1d1a12; box-shadow: 0 10px 30px rgba(212, 178, 111, 0.35); }
 .apre-btn-ouro:hover { background: linear-gradient(120deg, #fff0c8, var(--ap-gold-hi) 55%, var(--ap-gold)); }
+.apre-btn-painel { margin-top: 12px; }
 
 /* ---------- Telas menores ---------- */
 @media (max-width: 1000px) {
