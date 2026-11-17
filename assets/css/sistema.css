@@ -813,3 +813,13 @@ body.modo-form .sidebar, body.modo-form .topbar { display: none; }
 body.topo-escuro .topbar { background: #0c0b09; border-bottom-color: rgba(212, 178, 111, 0.18); }
 body.topo-escuro .topbar h1 { color: #f3efe6; }
 body.topo-escuro .menu-btn { color: #f3efe6; }
+
+/* Lançamentos: quatro abas grandes (Ciclos, Eventos, Modelo de avaliação, Indicação de negócio). */
+.lanc-abas { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.lanc-aba { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: border-color 0.15s ease, transform 0.15s ease; }
+.lanc-aba:hover { transform: translateY(-1px); border-color: var(--gold); }
+.lanc-aba.active { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 12%, var(--surface)); box-shadow: inset 0 -3px 0 var(--gold); }
+.lanc-aba-ico { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--soft-2); color: var(--gold-deep); }
+.lanc-aba.active .lanc-aba-ico { background: var(--charcoal); color: var(--gold); }
+.lanc-aba-txt strong { display: block; font-size: 0.92rem; }
+.lanc-aba-txt small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.74rem; }

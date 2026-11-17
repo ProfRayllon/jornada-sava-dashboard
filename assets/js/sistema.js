@@ -117,7 +117,7 @@
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
       if (!S.cicloPorId(state.ciclo)) state.ciclo = S.cicloVigente()?.id || null;
-      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(["lancamentos", "formulario"].includes(state.view) && state.lanc.aberto)) render();
+      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(["lancamentos", "formulario"].includes(state.view) && (state.lanc.aberto || ["modelo", "indicacao"].includes(state.lanc.aba)))) render();
     });
   });
 
@@ -511,45 +511,53 @@
     $("#novoCicloVazio", el)?.addEventListener("click", () => formCiclo());
   }
 
-  function abrirCiclos() {
-    const lista = S.listarCiclos();
-    abrirModal(
-      "Ciclos da Jornada",
-      `<p class="muted small">Cada ciclo é um painel: ranking, apresentação e site mostram só o que foi lançado entre o início e o fim. Os níveis continuam acumulando de um ciclo para o outro; os tetos valem por ciclo.</p>
-      <div class="ciclos-lista">
-        ${lista
-          .map((c) => {
-            const n = S.lancamentosDoCiclo(c.id).length;
-            return `<div class="ciclo-item ${c.id === state.ciclo ? "atual" : ""}">
-              <div class="ciclo-info">
-                <b>${esc(c.nome)}</b>
-                <small>${periodoCiclo(c)} · ${fmt(n)} lançamento(s)${c.anoBase ? " · base das planilhas" : ""}</small>
-                <small>Tetos: Felicidade ${fmt(c.tetoFelicidade)} · Eventos ${fmt(c.tetoEventos)}</small>
-              </div>
-              <span class="status ${c.publicado ? "on" : ""}">${c.publicado ? "No site" : "Oculto"}</span>
-              <div class="row-actions">
-                ${btnEditar("data-ciclo-editar", c.id)}
-                ${c.anoBase || n ? "" : btnExcluir("data-ciclo-excluir", c.id)}
-              </div>
-            </div>`;
-          })
-          .join("") || `<p class="muted">Nenhum ciclo cadastrado ainda.</p>`}
-      </div>
-      <div class="form-actions"><button class="btn btn-ghost" type="button" data-close>Fechar</button><button class="btn btn-gold" type="button" id="novoCiclo">+ Novo ciclo</button></div>`,
-    );
-    $("#novoCiclo").addEventListener("click", () => formCiclo());
-    $$("[data-ciclo-editar]").forEach((b) => b.addEventListener("click", () => formCiclo(S.cicloPorId(b.dataset.cicloEditar))));
-    $$("[data-ciclo-excluir]").forEach((b) =>
+  function listaCiclosHtml() {
+    return `<div class="ciclos-lista">
+      ${S.listarCiclos()
+        .map((c) => {
+          const n = S.lancamentosDoCiclo(c.id).length;
+          return `<div class="ciclo-item ${c.id === state.ciclo ? "atual" : ""}">
+            <div class="ciclo-info">
+              <b>${esc(c.nome)}</b>
+              <small>${periodoCiclo(c)} · ${fmt(n)} lançamento(s)${c.anoBase ? " · base das planilhas" : ""}</small>
+              <small>Tetos: Felicidade ${fmt(c.tetoFelicidade)} · Eventos ${fmt(c.tetoEventos)}</small>
+            </div>
+            <span class="status ${c.publicado ? "on" : ""}">${c.publicado ? "No site" : "Oculto"}</span>
+            <div class="row-actions">
+              ${btnEditar("data-ciclo-editar", c.id)}
+              ${c.anoBase || n ? "" : btnExcluir("data-ciclo-excluir", c.id)}
+            </div>
+          </div>`;
+        })
+        .join("") || `<p class="muted">Nenhum ciclo cadastrado ainda.</p>`}
+    </div>`;
+  }
+
+  // "depois": o que fazer ao voltar/terminar (reabrir a janela de ciclos ou só redesenhar a página).
+  function ligarListaCiclos(raiz, depois) {
+    $$("[data-ciclo-editar]", raiz).forEach((b) => b.addEventListener("click", () => formCiclo(S.cicloPorId(b.dataset.cicloEditar), depois)));
+    $$("[data-ciclo-excluir]", raiz).forEach((b) =>
       b.addEventListener("click", async () => {
         const c = S.cicloPorId(b.dataset.cicloExcluir);
         const sim = await confirmar({ titulo: "Excluir ciclo?", mensagem: `<b>${esc(c.nome)}</b> · ${periodoCiclo(c)}`, acao: "Excluir", perigo: true });
-        if (!sim) return abrirCiclos();
+        if (!sim) return depois();
         const r = await executar(() => S.excluirCiclo(c.id), { carregando: "Excluindo ciclo…", concluido: "Ciclo excluído" });
         if (r.ok && state.ciclo === c.id) state.ciclo = S.cicloVigente()?.id || null;
-        abrirCiclos();
+        depois();
         render();
       }),
     );
+  }
+
+  function abrirCiclos() {
+    abrirModal(
+      "Ciclos da Jornada",
+      `<p class="muted small">Cada ciclo é um painel: ranking, apresentação e site mostram só o que foi lançado entre o início e o fim. Os níveis continuam acumulando de um ciclo para o outro; os tetos valem por ciclo.</p>
+      ${listaCiclosHtml()}
+      <div class="form-actions"><button class="btn btn-ghost" type="button" data-close>Fechar</button><button class="btn btn-gold" type="button" id="novoCiclo">+ Novo ciclo</button></div>`,
+    );
+    $("#novoCiclo").addEventListener("click", () => formCiclo());
+    ligarListaCiclos($("#modal"), abrirCiclos);
   }
 
   // Sugestão para um ciclo novo: o semestre seguinte ao último cadastrado.
@@ -566,7 +574,7 @@
     };
   }
 
-  function formCiclo(c = null) {
+  function formCiclo(c = null, depois = abrirCiclos) {
     const sug = c ? null : proximoSemestre();
     abrirModal(
       c ? "Editar ciclo" : "Novo ciclo",
@@ -583,7 +591,7 @@
     );
     const form = $("#cicloForm");
     const campo = (n) => form.elements.namedItem(n);
-    $("#cicloVoltar").addEventListener("click", abrirCiclos);
+    $("#cicloVoltar").addEventListener("click", depois);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const dados = {
@@ -604,7 +612,7 @@
       });
       if (!r.ok) return ($("#cicloErro").textContent = r.erro.message);
       if (!c) state.ciclo = r.resultado.id;
-      abrirCiclos();
+      depois();
       render();
     });
   }
@@ -790,22 +798,89 @@
   // ---------------- Lançamentos (eventos + lançar/avaliar + histórico) ----------------
   // Uma página só: a aba Eventos lista o que foi cadastrado; o olho abre o evento para lançar
   // pontos ou avaliar; a aba Histórico mostra tudo o que já foi registrado.
+  // As quatro frentes da página, cada uma com o que precisa e nada mais.
+  const ABAS_LANC = {
+    ciclos: { nome: "Ciclos", dica: "Períodos da Jornada", icone: "eventos", perfis: ["admin"] },
+    eventos: { nome: "Eventos", dica: "Encontros, eventos, missões e avaliações", icone: "felicidade" },
+    modelo: { nome: "Modelo de avaliação", dica: "Perguntas do questionário", icone: "avaliacao", perfis: ["admin"] },
+    indicacao: { nome: "Indicação de negócio", dica: "Bônus dos advogados", icone: "indicacao", tipo: "indicacao" },
+  };
+  const abaPermitida = (id) => {
+    const a = ABAS_LANC[id];
+    const u = state.usuario;
+    return a && (!a.perfis || a.perfis.includes(u.perfil)) && (!a.tipo || perfis[u.perfil].tipos.includes(a.tipo));
+  };
+
   function renderLancamentos(el) {
+    if (state.lanc.aberto === "modelo") {
+      state.lanc.aberto = null;
+      state.lanc.aba = "modelo";
+    }
     if (state.lanc.aberto) return renderLancamentoAberto(el);
-    const aba = state.lanc.aba;
+    const historico = state.lanc.aba === "historico";
+    if (!historico && !abaPermitida(state.lanc.aba)) state.lanc.aba = "eventos";
+    const aba = historico ? "eventos" : state.lanc.aba;
     el.innerHTML = `
-      <div class="seg page-tabs" role="tablist" aria-label="Lançamentos">
-        <button type="button" role="tab" data-aba="eventos" class="${aba === "eventos" ? "active" : ""}" aria-selected="${aba === "eventos"}">Eventos</button>
-        <button type="button" role="tab" data-aba="historico" class="${aba === "historico" ? "active" : ""}" aria-selected="${aba === "historico"}">Histórico</button>
-      </div>
+      <nav class="lanc-abas" role="tablist" aria-label="Lançamentos">
+        ${Object.entries(ABAS_LANC)
+          .filter(([id]) => abaPermitida(id))
+          .map(([id, a]) => `<button type="button" role="tab" data-aba="${id}" class="lanc-aba ${aba === id ? "active" : ""}" aria-selected="${aba === id}">
+            <span class="lanc-aba-ico">${ico(a.icone)}</span>
+            <span class="lanc-aba-txt"><strong>${a.nome}</strong><small>${a.dica}</small></span>
+          </button>`)
+          .join("")}
+      </nav>
       <div id="lancCorpo"></div>`;
     $$("[data-aba]", el).forEach((b) =>
-      b.addEventListener("click", () => {
+      b.addEventListener("click", async () => {
+        if (state.lanc.aba === "modelo" && state.modeloEd?.alterado && b.dataset.aba !== "modelo") {
+          const sim = await confirmar({ titulo: "Sair sem salvar?", mensagem: "As alterações no modelo serão descartadas.", acao: "Sair sem salvar", perigo: true });
+          if (!sim) return;
+        }
+        if (b.dataset.aba !== "modelo") state.modeloEd = null;
         state.lanc.aba = b.dataset.aba;
         renderLancamentos(el);
       }),
     );
-    (aba === "historico" ? renderHistorico : renderEventos)($("#lancCorpo", el));
+    const corpo = $("#lancCorpo", el);
+    if (historico) return renderHistoricoAba(corpo);
+    ({ ciclos: renderCiclosAba, eventos: renderEventos, modelo: renderModeloAvaliacao, indicacao: renderIndicacaoAba })[aba](corpo);
+  }
+
+  // Histórico completo: aberto pelo botão "Histórico" da aba Eventos.
+  function renderHistoricoAba(el) {
+    el.innerHTML = `<div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarEventos">← Voltar para eventos</button></div><div id="histCorpo"></div>`;
+    $("#voltarEventos", el).addEventListener("click", () => {
+      state.lanc.aba = "eventos";
+      render();
+    });
+    renderHistorico($("#histCorpo", el));
+  }
+
+  // Aba Ciclos: a lista na própria página e o botão de criar em destaque.
+  function renderCiclosAba(el) {
+    el.innerHTML = `
+      <div class="card">
+        <div class="card-head">
+          <div><h2>Ciclos da Jornada</h2><p class="muted">Cada ciclo é um período com ranking, painel e apresentação próprios. Tudo o que for lançado entre o início e o fim entra nele.</p></div>
+          <div class="filters"><button class="btn btn-gold" id="cNovo">+ Criar ciclo</button></div>
+        </div>
+        ${listaCiclosHtml()}
+      </div>`;
+    const voltar = () => {
+      fecharModal();
+      render();
+    };
+    $("#cNovo", el).addEventListener("click", () => formCiclo(null, voltar));
+    ligarListaCiclos(el, voltar);
+  }
+
+  // Aba Indicação de negócio: o formulário direto, sem passar pela lista de eventos.
+  function renderIndicacaoAba(el) {
+    el.innerHTML = `
+      ${cabecalhoLancamento("indicacao", null)}
+      <form class="card form-card" id="lancForm" novalidate></form>`;
+    montarFormulario($("#lancForm", el), "indicacao", null);
   }
 
   function abrirLancamento(aberto) {
@@ -831,7 +906,10 @@
       <form class="card form-card" id="lancForm" novalidate></form>
       ${evento ? `<div id="lancFeitos"></div>` : ""}`;
     $("#voltarLanc", el)?.addEventListener("click", () => abrirLancamento(null));
-    $("#editarModelo", el)?.addEventListener("click", () => abrirLancamento("modelo"));
+    $("#editarModelo", el)?.addEventListener("click", () => {
+      state.lanc.aba = "modelo";
+      abrirLancamento(null);
+    });
     montarFormulario($("#lancForm", el), tipo, evento);
     if (evento) renderHistorico($("#lancFeitos", el), { atividadeId: evento.id });
   }
@@ -933,7 +1011,6 @@
     const gerencia = podeCadastrarEventos();
     const permitidos = perfis[state.usuario.perfil].tipos;
     const tiposVisiveis = Object.keys(tiposAtividade).filter((t) => permitidos.includes(t));
-    const avulsos = permitidos.filter((t) => !TIPOS_COM_EVENTO.includes(t));
     const lista = S.listarAtividades()
       .filter((a) => noCiclo(ciclo, a.data) && tiposVisiveis.includes(a.tipo))
       .sort((a, b) => a.data.localeCompare(b.data) || a.titulo.localeCompare(b.titulo));
@@ -944,9 +1021,7 @@
           <div><h2>Eventos · ${esc(ciclo?.nome || "sem ciclo")}</h2><p class="muted">${gerencia ? "Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
           <div class="filters">
             ${seletorCiclo("eAno")}
-            ${avulsos.map((t) => `<button class="btn btn-ghost" data-avulso="${t}">+ ${tipos[t].nome}</button>`).join("")}
-            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="abrirModelo">${ico("avaliacao")} Modelo de avaliação</button>` : ""}
-            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="eNovoCiclo">+ Novo ciclo</button>` : ""}
+            <button class="btn btn-ghost" id="eHistorico">${ico("historico")} Histórico</button>
             ${gerencia ? `<button class="btn btn-gold" id="novoEvento">+ Novo evento</button>` : ""}
           </div>
         </div>
@@ -976,10 +1051,11 @@
       </div>`;
 
     ligarSeletorCiclo(el, "eAno", renderEventos);
-    $("#eNovoCiclo", el)?.addEventListener("click", () => formCiclo());
+    $("#eHistorico", el).addEventListener("click", () => {
+      state.lanc.aba = "historico";
+      render();
+    });
     $("#novoEvento", el)?.addEventListener("click", () => formAtividade({ tipo: "felicidade" }));
-    $$("[data-avulso]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(`avulso:${b.dataset.avulso}`)));
-    $("#abrirModelo", el)?.addEventListener("click", () => abrirLancamento("modelo"));
     $$("[data-abrir]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(b.dataset.abrir)));
     // A linha inteira também abre o evento (menos os botões de editar/excluir).
     $$("[data-abrir-linha]", el).forEach((tr) =>
@@ -1452,10 +1528,7 @@
   const novoId = (prefixo) => `${prefixo}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
   function renderModeloAvaliacao(el) {
-    if (state.usuario.perfil !== "admin") {
-      state.lanc.aberto = null;
-      return renderLancamentos(el);
-    }
+    if (state.usuario.perfil !== "admin") return;
     const ed = (state.modeloEd ||= { cat: "adm", rascunho: structuredClone(S.modeloAvaliacao()), alterado: false });
     const m = ed.rascunho[ed.cat];
     const perguntasDaArea = (id) => m.perguntas.filter((q) => q.areaId === id);
@@ -1464,7 +1537,6 @@
     let n = 0;
 
     el.innerHTML = `
-      <div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para lançamentos</button></div>
       <section class="ev-banner" style="--c:${tipos.avaliacao.cor}">
         <span class="ev-banner-ico">${tipos.avaliacao.icone}</span>
         <div class="ev-banner-txt"><small>Ciclo de avaliação</small><h2>Modelo do questionário</h2><p>Organize as perguntas por área. Cada área conta para o grupo Técnico ou Socioemocional (que definem os selos), e cada pergunta tem 4 níveis de resposta com os Savacoins de cada um.</p></div>
@@ -1538,12 +1610,6 @@
       $("#modeloSalvar", el).disabled = false;
       $("#modeloDescartar", el).disabled = false;
     };
-    const sair = async () => {
-      if (ed.alterado && !(await confirmar({ titulo: "Sair sem salvar?", mensagem: "As alterações no modelo serão descartadas.", acao: "Sair sem salvar", perigo: true }))) return;
-      state.modeloEd = null;
-      abrirLancamento(null);
-    };
-    $("#voltarLanc", el).addEventListener("click", sair);
     $$("[data-mcat]", el).forEach((b) => b.addEventListener("click", () => ((ed.cat = b.dataset.mcat), renderModeloAvaliacao(el))));
 
     // Digitação: atualiza o rascunho sem redesenhar (o cursor não pula).
