@@ -89,7 +89,11 @@
     lancamentos: { nome: "Lançamentos", kicker: "Eventos, pontuação e histórico", render: renderLancamentos },
     pessoas: { nome: "Colaboradores", kicker: "Pessoas avaliadas", render: renderPessoas, perfis: ["admin", "rh"] },
     equipe: { nome: "Equipe e acessos", kicker: "Administração", render: renderEquipe, perfis: ["admin"] },
+    // RH e Coordenador entram direto aqui: só os formulários que cabem a eles, sem menu lateral.
+    formulario: { nome: "Formulários", kicker: "Jornada SAVA", render: renderFormulario, perfis: ["rh", "lider"], menu: "formulario" },
   };
+  const PERFIS_FORMULARIO = ["rh", "lider"];
+  const modoFormulario = () => PERFIS_FORMULARIO.includes(state.usuario?.perfil);
 
   const state = { usuario: null, ciclo: null, view: "visao", filtros: { busca: "", area: "all", nivel: "all" }, hist: { tipo: "all", busca: "", todosCiclos: true }, ev: { tipo: "all" }, lanc: { aba: "eventos", aberto: null } };
 
@@ -103,6 +107,7 @@
     if (hash === "historico") state.lanc.aba = "historico";
     if (["eventos", "lancar", "historico"].includes(hash)) hash = "lancamentos";
     if (views[hash] && podeVer(hash)) state.view = hash;
+    if (modoFormulario()) state.view = "formulario";
 
     montarShell();
     render();
@@ -112,7 +117,7 @@
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
       if (!S.cicloPorId(state.ciclo)) state.ciclo = S.cicloVigente()?.id || null;
-      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(state.view === "lancamentos" && state.lanc.aberto)) render();
+      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(["lancamentos", "formulario"].includes(state.view) && state.lanc.aberto)) render();
     });
   });
 
@@ -138,6 +143,7 @@
       <a href="index.html" title="Ver site da Jornada">${ico("site")}<span class="side-label">Ver site da Jornada</span></a>
       <button type="button" id="logoutBtn" title="Sair">${ico("sair")}<span class="side-label">Sair</span></button>`;
     $("#trocarSenhaBtn").addEventListener("click", () => abrirTrocaSenha(false));
+    if (modoFormulario()) montarTopoFormulario();
     $("#temaBtn").addEventListener("click", () => aplicarTema(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
     aplicarTema(document.documentElement.dataset.theme || "light");
 
@@ -200,6 +206,7 @@
   }
 
   function render() {
+    if (modoFormulario()) state.view = "formulario";
     if (!podeVer(state.view)) state.view = "visao";
     const v = views[state.view];
     $("#viewTitle").textContent = v.nome;
@@ -702,6 +709,83 @@
     $("#drawer").setAttribute("aria-hidden", "true");
   }
 
+  // ---------------- Modo formulário (RH e Coordenador) ----------------
+  // Sem menu lateral: logo, foto e nome no topo e, abaixo, só o que a pessoa precisa responder.
+  function montarTopoFormulario() {
+    document.body.classList.add("modo-form");
+    const u = state.usuario;
+    const pessoa = S.listarPessoas().find((p) => S.normalizar(p.nome) === S.normalizar(u.nome));
+    const foto = pessoa && S.fotoUrl(pessoa);
+    const topo = document.createElement("header");
+    topo.className = "form-topo";
+    topo.innerHTML = `
+      <img class="form-topo-logo" src="assets/logo/sava-logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
+      <div class="form-topo-user">
+        ${foto ? `<img class="avatar form-topo-foto" src="${foto}" alt="" />` : `<span class="avatar">${esc(iniciais(u.nome))}</span>`}
+        <div><strong>${esc(nomeBonito(u.nome))}</strong><small>${perfis[u.perfil].nome}</small></div>
+        <div class="form-topo-acoes">
+          <button type="button" class="btn btn-ghost btn-sm" id="formSenha">Alterar senha</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="formSair">Sair</button>
+        </div>
+      </div>`;
+    $(".main").prepend(topo);
+    $("#formSenha").addEventListener("click", () => abrirTrocaSenha(false));
+    $("#formSair").addEventListener("click", async () => {
+      await S.sair();
+      location.replace("login.html");
+    });
+  }
+
+  // Formulários em aberto no ciclo vigente: avaliações (Coordenador) ou também os eventos
+  // e a indicação de negócio (RH).
+  function formulariosAbertos() {
+    const u = state.usuario;
+    const permitidos = perfis[u.perfil].tipos;
+    const ciclo = cicloAtual();
+    const equipe = u.perfil === "lider" ? pessoasAtivas().filter((p) => p.coordenadorId === u.id) : null;
+    const itens = S.listarAtividades()
+      .filter((a) => noCiclo(ciclo, a.data) && permitidos.includes(a.tipo))
+      .sort((a, b) => b.data.localeCompare(a.data) || a.titulo.localeCompare(b.titulo))
+      .map((a) => {
+        const feitos = pontuadosNaAtividade(a.id);
+        const progresso = equipe && a.tipo === "avaliacao"
+          ? `${fmt(equipe.filter((p) => feitos.has(p.id)).length)} de ${fmt(equipe.length)} da sua equipe avaliados`
+          : `${fmt(feitos.size)} ${a.tipo === "avaliacao" ? "avaliado(s)" : "pontuado(s)"}`;
+        return { id: a.id, tipo: a.tipo, titulo: a.titulo, sub: `${dataBr(a.data)} · ${progresso}` };
+      });
+    permitidos
+      .filter((t) => !TIPOS_COM_EVENTO.includes(t))
+      .forEach((t) => itens.push({ id: `avulso:${t}`, tipo: t, titulo: tipos[t].nome, sub: tipos[t].desc }));
+    return itens;
+  }
+
+  function renderFormulario(el) {
+    const itens = formulariosAbertos();
+    // Um formulário só: abre direto, sem lista e sem "voltar".
+    state.formUnico = itens.length === 1;
+    if (state.formUnico) state.lanc.aberto = itens[0].id;
+    if (state.lanc.aberto && !itens.some((i) => i.id === state.lanc.aberto)) state.lanc.aberto = null;
+    el.classList.add("form-modo-corpo");
+    if (state.lanc.aberto) return renderLancamentoAberto(el);
+    const ciclo = cicloAtual();
+    el.innerHTML = `
+      <section class="form-inicio">
+        <p class="form-kicker">${esc(ciclo?.nome || "Jornada SAVA")}</p>
+        <h1>Olá, ${esc(nomeBonito(state.usuario.nome).split(" ")[0])}</h1>
+        <p class="muted">${itens.length ? "Escolha o formulário que você vai responder." : ""}</p>
+      </section>
+      ${itens.length
+        ? `<div class="form-lista">${itens
+            .map((i) => `<button type="button" class="form-item" data-form="${esc(i.id)}" style="--c:${tipos[i.tipo].cor}">
+              <span class="form-item-ico">${tipos[i.tipo].icone}</span>
+              <span class="form-item-txt"><strong>${esc(i.titulo)}</strong><small>${esc(i.sub)}</small></span>
+              <span class="form-item-seta" aria-hidden="true">→</span>
+            </button>`)
+            .join("")}</div>`
+        : `<div class="card form-vazio"><strong>Nenhum formulário aberto para você agora.</strong><p class="muted small">Quando o RH abrir um novo ciclo de avaliação, ele aparece aqui.</p></div>`}`;
+    $$("[data-form]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(b.dataset.form)));
+  }
+
   // ---------------- Lançamentos (eventos + lançar/avaliar + histórico) ----------------
   // Uma página só: a aba Eventos lista o que foi cadastrado; o olho abre o evento para lançar
   // pontos ou avaliar; a aba Histórico mostra tudo o que já foi registrado.
@@ -741,11 +825,11 @@
       return renderLancamentos(el);
     }
     el.innerHTML = `
-      <div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para lançamentos</button></div>
+      ${modoFormulario() && state.formUnico ? "" : `<div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para ${modoFormulario() ? "os formulários" : "lançamentos"}</button></div>`}
       ${cabecalhoLancamento(tipo, evento)}
       <form class="card form-card" id="lancForm" novalidate></form>
       ${evento ? `<div id="lancFeitos"></div>` : ""}`;
-    $("#voltarLanc", el).addEventListener("click", () => abrirLancamento(null));
+    $("#voltarLanc", el)?.addEventListener("click", () => abrirLancamento(null));
     $("#editarModelo", el)?.addEventListener("click", () => abrirLancamento("modelo"));
     montarFormulario($("#lancForm", el), tipo, evento);
     if (evento) renderHistorico($("#lancFeitos", el), { atividadeId: evento.id });

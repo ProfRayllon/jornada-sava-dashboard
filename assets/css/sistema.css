@@ -778,3 +778,33 @@ img { max-width: 100%; }
 .ciclo-info { display: grid; gap: 2px; min-width: 0; }
 .ciclo-info small { color: var(--muted); font-size: 0.74rem; }
 @media (max-width: 560px) { .ciclo-item { grid-template-columns: 1fr auto; } .ciclo-item .row-actions { grid-column: 1 / -1; justify-content: flex-start; } }
+
+/* ---------- Modo formulário (RH e Coordenador): sem menu, estilo formulário ---------- */
+body.modo-form .app { grid-template-columns: 1fr; }
+body.modo-form .sidebar, body.modo-form .topbar { display: none; }
+.form-topo { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 14px 32px; background: #1b1b1a; border-bottom: 1px solid rgba(212, 178, 111, 0.25); }
+.form-topo-logo { height: 40px; width: auto; }
+.form-topo-user { display: flex; align-items: center; gap: 12px; color: #f3efe6; }
+.form-topo-user strong { display: block; font-size: 0.88rem; }
+.form-topo-user small { display: block; font-size: 0.72rem; color: var(--gold); }
+.form-topo-foto { object-fit: cover; padding: 0; }
+.form-topo-acoes { display: flex; gap: 6px; margin-left: 8px; }
+.form-topo-acoes .btn { color: #f3efe6; border-color: rgba(255, 255, 255, 0.18); background: transparent; }
+.content.form-modo-corpo { width: 100%; max-width: 920px; margin: 0 auto; }
+.form-inicio { padding-top: 12px; }
+.form-kicker { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold-deep); }
+.form-inicio h1 { margin: 6px 0 4px; font-size: 1.7rem; }
+.form-lista { display: grid; gap: 12px; }
+.form-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; width: 100%; padding: 18px 20px; border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); color: inherit; font: inherit; text-align: left; cursor: pointer; transition: transform 0.15s ease, border-color 0.15s ease; }
+.form-item:hover { transform: translateY(-1px); border-color: var(--c); }
+.form-item-ico { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: color-mix(in srgb, var(--c) 14%, var(--surface)); color: var(--c); }
+.form-item-txt strong { display: block; font-size: 1rem; }
+.form-item-txt small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.8rem; }
+.form-item-seta { color: var(--c); font-size: 1.2rem; font-weight: 700; }
+.form-vazio { text-align: center; }
+@media (max-width: 760px) {
+  .form-topo { padding: 12px 16px; }
+  .form-topo-logo { height: 32px; }
+  .form-topo-user > div:not(.form-topo-acoes) { display: none; }
+  .form-topo-acoes { margin-left: 0; }
+}
