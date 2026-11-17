@@ -128,6 +128,20 @@
   const rotulosNota = ["Abaixo do esperado", "Em desenvolvimento", "Atende", "Supera as expectativas"];
   const grupos = { tecnica: "Técnico", socio: "Socioemocional" };
 
+  // Enunciados do formulário oficial (Seção 2: Advogados; Seção 3: Controladoria e Administrativo).
+  const descricoesPadrao = {
+    responsabilidade: "Como você avalia o desempenho do(a) advogado(a) em relação à gestão do tempo, ao cumprimento das atividades e à manutenção de elevados padrões éticos?",
+    relacionamentos: "Como você avalia o desempenho do(a) advogado(a) em relação à interação respeitosa e eficaz com clientes, colegas e superiores?",
+    conhecimentos: "Como você avalia o desempenho do(a) advogado(a) em relação à aplicação ágil e precisa dos conhecimentos jurídicos e à qualidade técnica das soluções apresentadas?",
+    proatividadeEstrategica: "Como você avalia o desempenho do(a) advogado(a) em relação à capacidade de antecipar desafios, resolver conflitos e propor soluções estratégicas?",
+    qualidade: "Como você avalia o desempenho do(a) colaborador(a) em relação à clareza, precisão e excelência na execução de documentos e processos?",
+    eficiencia: "Como você avalia o desempenho do(a) colaborador(a) em relação à pontualidade, cordialidade e capacidade de resolver demandas dos clientes de maneira eficaz?",
+    ferramentas: "Como você avalia o desempenho do(a) colaborador(a) em relação ao uso produtivo e eficiente de softwares e sistemas internos?",
+    proatividade: "Como você avalia o desempenho do(a) colaborador(a) em relação à iniciativa em projetos, à apresentação de sugestões de melhorias e à adoção de atitudes construtivas?",
+    inteligencia: "Como você avalia o desempenho do(a) colaborador(a) em relação à empatia, comunicação eficaz e manutenção de bons relacionamentos interpessoais?",
+    autogestao: "Como você avalia o desempenho do(a) colaborador(a) em relação à organização, ao foco e à responsabilidade no cumprimento de suas entregas?",
+  };
+
   function modeloPadrao() {
     const areasPadrao = {
       adm: [
@@ -147,7 +161,7 @@
           id: c.id,
           areaId: `${cat}-${c.grupo}`,
           texto: c.nome,
-          descricao: "",
+          descricao: descricoesPadrao[c.id] || "",
           valores: c.opcoes.map((o) => o.valor),
         })),
       };
@@ -233,6 +247,7 @@
     rotulosNota,
     grupos,
     modeloPadrao,
+    descricoesPadrao,
     perguntasDoModelo,
     totaisAvaliacao,
     pontuacaoBimestral,

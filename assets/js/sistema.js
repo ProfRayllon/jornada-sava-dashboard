@@ -117,7 +117,7 @@
       state.usuario = S.usuarioAtual();
       if (!state.usuario) return location.replace("login.html");
       if (!S.cicloPorId(state.ciclo)) state.ciclo = S.cicloVigente()?.id || null;
-      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(["lancamentos", "formulario"].includes(state.view) && (state.lanc.aberto || ["modelo", "indicacao"].includes(state.lanc.aba)))) render();
+      if (!$("#modal").classList.contains("open") && !["painel", "apresentacao"].includes(state.view) && !(["lancamentos", "formulario"].includes(state.view) && (state.lanc.aberto || ["modelo", "indicacao"].includes(state.lanc.aba))) && !emAndamento()) render();
     });
   });
 
@@ -719,7 +719,16 @@
   }
 
   // ---------------- Modo formulário (RH e Coordenador) ----------------
-  // Sem menu lateral: logo, foto e nome no topo e, abaixo, só o que a pessoa precisa responder.
+  // Sem menu lateral. O avaliador escolhe o período de avaliação, vê a equipe e responde uma
+  // pergunta por tela (uma pessoa ou várias de uma vez). O RH também lança a frequência dos eventos.
+  const SECOES_AVALIACAO = { adv: "Avaliação dos Advogados", adm: "Avaliação da Controladoria e do Administrativo" };
+  const PERGUNTAS_ABERTAS = {
+    feedback: "Deixe uma mensagem para seu colaborador como feedback do período avaliado",
+    destaque: "Você considera que ele(a) merece algum destaque especial? Se sim, descreva abaixo.",
+  };
+  const fm = () => (state.fm ||= { secao: "avaliacao", tela: "inicio", eventoId: null, selecionados: null });
+  const emAndamento = () => modoFormulario() && ["avaliar", "frequencia"].includes(state.fm?.tela);
+
   function montarTopoFormulario() {
     document.body.classList.add("modo-form");
     const u = state.usuario;
@@ -728,15 +737,15 @@
     const topo = document.createElement("header");
     topo.className = "form-topo";
     topo.innerHTML = `
-      <img class="form-topo-logo" src="assets/logo/sava-logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />
       <div class="form-topo-user">
         ${foto ? `<img class="avatar form-topo-foto" src="${foto}" alt="" />` : `<span class="avatar">${esc(iniciais(u.nome))}</span>`}
-        <div><strong>${esc(nomeBonito(u.nome))}</strong><small>${perfis[u.perfil].nome}</small></div>
-        <div class="form-topo-acoes">
-          <button type="button" class="btn btn-ghost btn-sm" id="formSenha">Alterar senha</button>
-          <button type="button" class="btn btn-ghost btn-sm" id="formSair">Sair</button>
+        <div>
+          <small>${u.perfil === "lider" ? "Avaliador(a)" : "RH"}</small>
+          <strong>${esc(nomeBonito(u.nome))}</strong>
+          <span class="form-topo-links"><button type="button" id="formSenha">Alterar senha</button> · <button type="button" id="formSair">Sair</button></span>
         </div>
-      </div>`;
+      </div>
+      <img class="form-topo-logo" src="assets/logo/sava-logo.png" alt="Sebadelhe Aranha & Vasconcelos Advocacia" />`;
     $(".main").prepend(topo);
     $("#formSenha").addEventListener("click", () => abrirTrocaSenha(false));
     $("#formSair").addEventListener("click", async () => {
@@ -745,54 +754,414 @@
     });
   }
 
-  // Formulários em aberto no ciclo vigente: avaliações (Coordenador) ou também os eventos
-  // e a indicação de negócio (RH).
-  function formulariosAbertos() {
+  const fotoOuIniciais = (p, classe = "") => {
+    const url = S.fotoUrl(p);
+    return url ? `<img class="fm-foto ${classe}" src="${url}" alt="" loading="lazy" />` : `<span class="fm-foto fm-iniciais ${classe}">${esc(iniciais(p.nome))}</span>`;
+  };
+
+  // Equipe que o usuário avalia: a do coordenador; para o RH, quem está sem coordenador.
+  function equipeAvaliada() {
     const u = state.usuario;
-    const permitidos = perfis[u.perfil].tipos;
+    const ativos = pessoasAtivas().filter((p) => R.categoriasPontuaveis.includes(p.categoria));
+    return u.perfil === "lider" ? ativos.filter((p) => p.coordenadorId === u.id) : ativos.filter((p) => !p.coordenadorId);
+  }
+
+  // Períodos de avaliação (eventos "Ciclo de avaliação") do ciclo vigente.
+  function periodosAvaliacao() {
     const ciclo = cicloAtual();
-    const equipe = u.perfil === "lider" ? pessoasAtivas().filter((p) => p.coordenadorId === u.id) : null;
-    const itens = S.listarAtividades()
-      .filter((a) => noCiclo(ciclo, a.data) && permitidos.includes(a.tipo))
-      .sort((a, b) => b.data.localeCompare(a.data) || a.titulo.localeCompare(b.titulo))
-      .map((a) => {
-        const feitos = pontuadosNaAtividade(a.id);
-        const progresso = equipe && a.tipo === "avaliacao"
-          ? `${fmt(equipe.filter((p) => feitos.has(p.id)).length)} de ${fmt(equipe.length)} da sua equipe avaliados`
-          : `${fmt(feitos.size)} ${a.tipo === "avaliacao" ? "avaliado(s)" : "pontuado(s)"}`;
-        return { id: a.id, tipo: a.tipo, titulo: a.titulo, sub: `${dataBr(a.data)} · ${progresso}` };
-      });
-    permitidos
-      .filter((t) => !TIPOS_COM_EVENTO.includes(t))
-      .forEach((t) => itens.push({ id: `avulso:${t}`, tipo: t, titulo: tipos[t].nome, sub: tipos[t].desc }));
-    return itens;
+    return S.listarAtividades()
+      .filter((a) => a.tipo === "avaliacao" && noCiclo(ciclo, a.data))
+      .sort((a, b) => b.data.localeCompare(a.data));
   }
 
   function renderFormulario(el) {
-    const itens = formulariosAbertos();
-    // Um formulário só: abre direto, sem lista e sem "voltar".
-    state.formUnico = itens.length === 1;
-    if (state.formUnico) state.lanc.aberto = itens[0].id;
-    if (state.lanc.aberto && !itens.some((i) => i.id === state.lanc.aberto)) state.lanc.aberto = null;
     el.classList.add("form-modo-corpo");
-    if (state.lanc.aberto) return renderLancamentoAberto(el);
-    const ciclo = cicloAtual();
+    const f = fm();
+    if (state.usuario.perfil !== "rh") f.secao = "avaliacao";
+    if (f.tela === "avaliar") return renderAssistente(el);
+    if (f.tela === "frequencia") return renderFrequencia(el);
+    if (f.tela === "fim") return renderFimAvaliacao(el);
+    const rh = state.usuario.perfil === "rh";
     el.innerHTML = `
-      <section class="form-inicio">
-        <p class="form-kicker">${esc(ciclo?.nome || "Jornada SAVA")}</p>
-        <h1>Olá, ${esc(nomeBonito(state.usuario.nome).split(" ")[0])}</h1>
-        <p class="muted">${itens.length ? "Escolha o formulário que você vai responder." : ""}</p>
+      <section class="fm-hero">
+        <p class="form-kicker">${esc(cicloAtual()?.nome || "Jornada SAVA")}</p>
+        <h1>Olá, ${esc(nomeBonito(state.usuario.nome).split(" ")[0])}!</h1>
+        <p class="muted">${f.secao === "avaliacao" ? "Escolha o período disponível e avalie a sua equipe." : "Escolha o evento e marque quem participou."}</p>
       </section>
-      ${itens.length
-        ? `<div class="form-lista">${itens
-            .map((i) => `<button type="button" class="form-item" data-form="${esc(i.id)}" style="--c:${tipos[i.tipo].cor}">
-              <span class="form-item-ico">${tipos[i.tipo].icone}</span>
-              <span class="form-item-txt"><strong>${esc(i.titulo)}</strong><small>${esc(i.sub)}</small></span>
-              <span class="form-item-seta" aria-hidden="true">→</span>
-            </button>`)
-            .join("")}</div>`
-        : `<div class="card form-vazio"><strong>Nenhum formulário aberto para você agora.</strong><p class="muted small">Quando o RH abrir um novo ciclo de avaliação, ele aparece aqui.</p></div>`}`;
-    $$("[data-form]", el).forEach((b) => b.addEventListener("click", () => abrirLancamento(b.dataset.form)));
+      ${rh
+        ? `<div class="fm-secoes" role="tablist">
+            <button type="button" data-secao="avaliacao" class="${f.secao === "avaliacao" ? "active" : ""}">${ico("avaliacao")}<span><b>Avaliações</b><small>Questionário dos colaboradores</small></span></button>
+            <button type="button" data-secao="frequencia" class="${f.secao === "frequencia" ? "active" : ""}">${ico("felicidade")}<span><b>Frequência dos eventos</b><small>Quem participou de cada evento</small></span></button>
+          </div>`
+        : ""}
+      <div id="fmCorpo"></div>`;
+    $$("[data-secao]", el).forEach((b) => b.addEventListener("click", () => ((f.secao = b.dataset.secao), renderFormulario(el))));
+    (f.secao === "frequencia" ? renderListaEventosRh : renderInicioAvaliacao)($("#fmCorpo", el));
+  }
+
+  function renderInicioAvaliacao(el) {
+    const f = fm();
+    const periodos = periodosAvaliacao();
+    const equipe = equipeAvaliada();
+    if (!periodos.length) {
+      el.innerHTML = `<div class="fm-vazio">${ico("avaliacao")}<b>Nenhum período de avaliação aberto agora.</b><p class="muted small">Quando o RH abrir um período, ele aparece aqui.</p></div>`;
+      return;
+    }
+    const pendentesDe = (ev) => {
+      const feitos = pontuadosNaAtividade(ev.id);
+      return equipe.filter((p) => !feitos.has(p.id));
+    };
+    if (!periodos.some((p) => p.id === f.eventoId)) f.eventoId = (periodos.find((p) => pendentesDe(p).length) || periodos[0]).id;
+    const ev = periodos.find((p) => p.id === f.eventoId);
+    const feitos = pontuadosNaAtividade(ev.id);
+    const pendentes = pendentesDe(ev);
+    if (!f.selecionados || f.selecionadosDe !== ev.id) {
+      f.selecionados = new Set(pendentes.map((p) => p.id));
+      f.selecionadosDe = ev.id;
+    }
+    f.selecionados.forEach((id) => !pendentes.some((p) => p.id === id) && f.selecionados.delete(id));
+    const n = f.selecionados.size;
+
+    el.innerHTML = `
+      <h2 class="fm-titulo"><span>1</span> Período de avaliação</h2>
+      <div class="fm-periodos">
+        ${periodos
+          .map((p) => {
+            const pend = pendentesDe(p).length;
+            const feito = equipe.length - pend;
+            return `<button type="button" class="fm-periodo ${p.id === ev.id ? "active" : ""}" data-periodo="${esc(p.id)}">
+              <b>${esc(p.titulo)}</b>
+              <small>${dataBr(p.data)}</small>
+              <span class="fm-barra"><i style="width:${equipe.length ? Math.round((feito / equipe.length) * 100) : 0}%"></i></span>
+              <small>${pend ? `${fmt(feito)} de ${fmt(equipe.length)} avaliados` : "✓ Equipe toda avaliada"}</small>
+            </button>`;
+          })
+          .join("")}
+      </div>
+
+      <h2 class="fm-titulo"><span>2</span> ${state.usuario.perfil === "lider" ? "Sua equipe" : "Colaboradores sem coordenador"}
+        ${pendentes.length > 1 ? `<button type="button" class="fm-link" id="fmTodos">${n === pendentes.length ? "Desmarcar todos" : "Selecionar todos"}</button>` : ""}</h2>
+      ${equipe.length
+        ? `<div class="fm-equipe">
+            ${equipe
+              .map((p) => {
+                const ok = feitos.has(p.id);
+                const sel = f.selecionados.has(p.id);
+                return `<button type="button" class="fm-pessoa ${ok ? "feito" : ""} ${sel ? "sel" : ""}" data-pessoa="${esc(p.id)}" ${ok ? "disabled" : ""}>
+                  ${fotoOuIniciais(p)}
+                  <b>${esc(nomeBonito(p.nome))}</b>
+                  <small>${p.categoria === "adv" ? "Advogado(a)" : "Controladoria e Adm."}</small>
+                  <span class="fm-check" aria-hidden="true">${ok ? "✓ Avaliado" : sel ? "✓" : ""}</span>
+                </button>`;
+              })
+              .join("")}
+          </div>`
+        : `<div class="fm-vazio"><b>${state.usuario.perfil === "lider" ? "Nenhum colaborador ligado a você ainda." : "Todos os colaboradores têm coordenador."}</b><p class="muted small">${state.usuario.perfil === "lider" ? "Peça ao RH para incluir sua equipe em Colaboradores." : "As avaliações são feitas pelos coordenadores."}</p></div>`}
+
+      <div class="fm-acao">
+        <button type="button" class="fm-comecar" id="fmComecar" ${n ? "" : "disabled"}>
+          ${pendentes.length ? `Começar sua avaliação${n ? ` · ${n} ${n === 1 ? "pessoa" : "pessoas"}` : ""} →` : "Equipe toda avaliada ✓"}
+        </button>
+        ${pendentes.length ? `<p class="muted small">Toque nas pessoas para escolher quem avaliar agora: uma de cada vez ou todas juntas.</p>` : ""}
+      </div>`;
+
+    $$("[data-periodo]", el).forEach((b) => b.addEventListener("click", () => ((f.eventoId = b.dataset.periodo), (f.selecionados = null), renderInicioAvaliacao(el))));
+    $$("[data-pessoa]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = b.dataset.pessoa;
+        f.selecionados.has(id) ? f.selecionados.delete(id) : f.selecionados.add(id);
+        renderInicioAvaliacao(el);
+      }),
+    );
+    $("#fmTodos", el)?.addEventListener("click", () => {
+      f.selecionados = n === pendentes.length ? new Set() : new Set(pendentes.map((p) => p.id));
+      renderInicioAvaliacao(el);
+    });
+    $("#fmComecar", el).addEventListener("click", () => {
+      const pessoas = S.listarPessoas().filter((p) => f.selecionados.has(p.id));
+      f.av = { eventoId: ev.id, pessoas: pessoas.map((p) => p.id), passo: 0, notas: {}, feedback: {}, destaque: {} };
+      f.tela = "avaliar";
+      render();
+      window.scrollTo({ top: 0 });
+    });
+  }
+
+  // Passos do questionário: as perguntas de cada perfil, as duas perguntas abertas e a revisão.
+  function passosAvaliacao(av) {
+    const pessoas = av.pessoas.map((id) => S.listarPessoas().find((p) => p.id === id)).filter(Boolean);
+    const passos = [];
+    ["adv", "adm"].forEach((cat) => {
+      const grupo = pessoas.filter((p) => p.categoria === cat);
+      if (grupo.length) perguntasAvaliacao(cat).forEach((q, i, todas) => passos.push({ tipo: "q", cat, q, n: i + 1, total: todas.length, pessoas: grupo }));
+    });
+    passos.push({ tipo: "texto", campo: "feedback", pessoas });
+    passos.push({ tipo: "texto", campo: "destaque", pessoas });
+    passos.push({ tipo: "revisao", pessoas });
+    return passos;
+  }
+
+  function renderAssistente(el) {
+    const f = fm();
+    const av = f.av;
+    const ev = S.listarAtividades().find((a) => a.id === av?.eventoId);
+    if (!av || !ev) return sairAssistente();
+    const passos = passosAvaliacao(av);
+    av.passo = Math.min(av.passo, passos.length - 1);
+    const p = passos[av.passo];
+    const nota = (pid, qid) => av.notas[pid]?.[qid];
+    const completo = p.tipo !== "q" || p.pessoas.every((x) => nota(x.id, p.q.id) != null);
+    const pct = Math.round((av.passo / (passos.length - 1)) * 100);
+    const voltar = `<button type="button" class="btn-voltar" id="fmAnterior">${av.passo ? "← Anterior" : "← Sair"}</button>`;
+
+    let corpo = "";
+    if (p.tipo === "q") {
+      const opcoes = (pid) =>
+        p.q.valores
+          .map((v, nivel) => `<button type="button" class="fm-opcao nivel-${nivel} ${nota(pid, p.q.id) === v ? "sel" : ""}" data-nota="${v}" data-p="${esc(pid)}"><i aria-hidden="true"></i><span>${R.rotulosNota[nivel]}</span></button>`)
+          .join("");
+      corpo = `
+        <p class="fm-secao">${SECOES_AVALIACAO[p.cat]} · Pergunta ${p.n} de ${p.total}</p>
+        <h1 class="fm-pergunta">${esc(p.q.texto)}</h1>
+        ${p.q.descricao ? `<p class="fm-descricao">${esc(p.q.descricao)}</p>` : ""}
+        ${p.pessoas.length === 1
+          ? `<div class="fm-avaliado">${fotoOuIniciais(p.pessoas[0], "sm")}<b>${esc(nomeBonito(p.pessoas[0].nome))}</b></div>
+             <div class="fm-opcoes grande">${opcoes(p.pessoas[0].id)}</div>`
+          : `<div class="fm-todos"><span>Mesma resposta para todos:</span><div class="fm-opcoes mini">${p.q.valores
+              .map((v, nivel) => `<button type="button" class="fm-opcao nivel-${nivel}" data-todos="${v}"><i aria-hidden="true"></i><span>${R.rotulosNota[nivel]}</span></button>`)
+              .join("")}</div></div>
+             <div class="fm-linhas">${p.pessoas
+               .map((x) => `<div class="fm-linha ${nota(x.id, p.q.id) != null ? "ok" : ""}"><div class="fm-linha-quem">${fotoOuIniciais(x, "sm")}<b>${esc(nomeBonito(x.nome))}</b></div><div class="fm-opcoes">${opcoes(x.id)}</div></div>`)
+               .join("")}</div>`}`;
+    } else if (p.tipo === "texto") {
+      corpo = `
+        <p class="fm-secao">Perguntas abertas · ${p.campo === "feedback" ? "1" : "2"} de 2</p>
+        <h1 class="fm-pergunta">${PERGUNTAS_ABERTAS[p.campo]}</h1>
+        <div class="fm-textos">${p.pessoas
+          .map((x) => `<label class="fm-texto">${p.pessoas.length > 1 ? `<span>${fotoOuIniciais(x, "sm")}<b>${esc(nomeBonito(x.nome))}</b></span>` : ""}
+            <textarea data-texto="${esc(x.id)}" rows="${p.pessoas.length > 1 ? 3 : 6}" placeholder="${p.campo === "feedback" ? "Escreva sua mensagem…" : "Opcional"}">${esc(av[p.campo][x.id] || "")}</textarea></label>`)
+          .join("")}</div>`;
+    } else {
+      corpo = `
+        <p class="fm-secao">Revisão</p>
+        <h1 class="fm-pergunta">Tudo certo? Confira e envie.</h1>
+        <div class="fm-revisao">${p.pessoas
+          .map((x) => {
+            const qs = perguntasAvaliacao(x.categoria);
+            const respondidas = qs.filter((q) => nota(x.id, q.id) != null).length;
+            return `<div class="fm-rev-item">${fotoOuIniciais(x, "sm")}<div><b>${esc(nomeBonito(x.nome))}</b><small>${respondidas} de ${qs.length} perguntas · ${av.feedback[x.id] ? "com feedback" : "sem feedback"}${av.destaque[x.id] ? " · com destaque" : ""}</small></div><span class="fm-rev-ok">${respondidas === qs.length ? "✓" : "!"}</span></div>`;
+          })
+          .join("")}</div>`;
+    }
+
+    el.innerHTML = `
+      <div class="fm-assistente">
+        <div class="fm-topo-passo">
+          ${voltar}
+          <span class="fm-evento">${esc(ev.titulo)}</span>
+        </div>
+        <div class="fm-progresso" aria-hidden="true"><i style="width:${pct}%"></i></div>
+        <section class="fm-cartao">${corpo}</section>
+        <div class="fm-nav">
+          ${p.tipo === "revisao"
+            ? `<button type="button" class="fm-comecar" id="fmEnviar">Enviar ${p.pessoas.length > 1 ? `${p.pessoas.length} avaliações` : "avaliação"} ✓</button>`
+            : `<button type="button" class="fm-comecar" id="fmProxima" ${completo ? "" : "disabled"}>Próxima →</button>`}
+        </div>
+      </div>`;
+
+    const ir = (passo) => {
+      av.passo = passo;
+      renderAssistente(el);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+    $("#fmAnterior", el).addEventListener("click", async () => {
+      if (av.passo) return ir(av.passo - 1);
+      if (await confirmar({ titulo: "Sair da avaliação?", mensagem: "As respostas desta avaliação ainda não foram enviadas e serão perdidas.", acao: "Sair", perigo: true })) sairAssistente();
+    });
+    $("#fmProxima", el)?.addEventListener("click", () => ir(av.passo + 1));
+    $$("[data-nota]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        (av.notas[b.dataset.p] ||= {})[p.q.id] = Number(b.dataset.nota);
+        // Uma pessoa só: ao escolher, já passa para a próxima pergunta.
+        if (p.pessoas.length === 1) return setTimeout(() => ir(av.passo + 1), 220);
+        renderAssistente(el);
+      }),
+    );
+    $$("[data-todos]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        p.pessoas.forEach((x) => ((av.notas[x.id] ||= {})[p.q.id] = Number(b.dataset.todos)));
+        renderAssistente(el);
+      }),
+    );
+    $$("[data-texto]", el).forEach((t) => t.addEventListener("input", () => (av[p.campo][t.dataset.texto] = t.value)));
+    $("#fmEnviar", el)?.addEventListener("click", () => enviarAvaliacoes(p.pessoas));
+  }
+
+  async function enviarAvaliacoes(pessoas) {
+    const av = fm().av;
+    const falhas = [];
+    const r = await executar(
+      async () => {
+        for (const p of pessoas) {
+          try {
+            await S.registrarLancamento({
+              tipo: "avaliacao",
+              atividadeId: av.eventoId,
+              pessoaId: p.id,
+              categoria: p.categoria,
+              notas: av.notas[p.id] || {},
+              area: p.setor || "",
+              feedback: (av.feedback[p.id] || "").trim(),
+              destaque: (av.destaque[p.id] || "").trim(),
+            });
+            av.pessoas = av.pessoas.filter((id) => id !== p.id);
+          } catch (erro) {
+            falhas.push(`${nomeBonito(p.nome)}: ${erro.message}`);
+          }
+        }
+        if (falhas.length === pessoas.length) throw new Error(falhas.join(" · "));
+        return pessoas.length - falhas.length;
+      },
+      { carregando: "Enviando avaliações…", concluido: "Avaliação enviada", detalhe: (n) => `${n} ${n === 1 ? "colaborador avaliado" : "colaboradores avaliados"}${falhas.length ? `<br>Não enviadas: ${esc(falhas.join(" · "))}` : ""}` },
+    );
+    if (!r.ok) return;
+    const f = fm();
+    if (av.pessoas.length) {
+      av.passo = 0;
+      return render();
+    }
+    f.fimN = r.resultado;
+    f.tela = "fim";
+    f.av = null;
+    f.selecionados = null;
+    render();
+  }
+
+  function renderFimAvaliacao(el) {
+    const f = fm();
+    el.innerHTML = `
+      <section class="fm-fim">
+        <span class="fm-fim-ico">✓</span>
+        <h1>Avaliação concluída!</h1>
+        <p class="muted">${fmt(f.fimN || 0)} ${f.fimN === 1 ? "colaborador avaliado" : "colaboradores avaliados"}. Obrigado pelo seu tempo.</p>
+        <button type="button" class="fm-comecar" id="fmVoltarInicio">Voltar para a minha equipe</button>
+      </section>`;
+    $("#fmVoltarInicio", el).addEventListener("click", sairAssistente);
+  }
+
+  function sairAssistente() {
+    const f = fm();
+    f.tela = "inicio";
+    f.av = null;
+    render();
+    window.scrollTo({ top: 0 });
+  }
+
+  // ---- Frequência dos eventos (RH) ----
+  function renderListaEventosRh(el) {
+    const ciclo = cicloAtual();
+    const eventos = S.listarAtividades()
+      .filter((a) => ["felicidade", "evento", "missao"].includes(a.tipo) && noCiclo(ciclo, a.data))
+      .sort((a, b) => b.data.localeCompare(a.data));
+    el.innerHTML = eventos.length
+      ? `<div class="fm-eventos">${eventos
+          .map((a) => {
+            const n = pontuadosNaAtividade(a.id).size;
+            return `<button type="button" class="fm-evento-card" data-ev="${esc(a.id)}" style="--c:${tipos[a.tipo].cor}">
+              <span class="fm-evento-ico">${tipos[a.tipo].icone}</span>
+              <span class="fm-evento-txt"><small>${tiposAtividade[a.tipo].curto} · ${dataBr(a.data)}</small><b>${esc(a.titulo)}</b><em>${fmt(a.pontos)} Savacoins por pessoa</em></span>
+              <span class="fm-evento-n"><b>${fmt(n)}</b><small>presentes</small></span>
+            </button>`;
+          })
+          .join("")}</div>`
+      : `<div class="fm-vazio">${ico("felicidade")}<b>Nenhum evento cadastrado neste ciclo.</b><p class="muted small">Os eventos são cadastrados pelo administrador em Lançamentos.</p></div>`;
+    $$("[data-ev]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        const f = fm();
+        f.freq = { eventoId: b.dataset.ev, presentes: new Set(), busca: "" };
+        f.tela = "frequencia";
+        render();
+        window.scrollTo({ top: 0 });
+      }),
+    );
+  }
+
+  function renderFrequencia(el) {
+    const f = fm();
+    const fr = f.freq;
+    const ev = S.listarAtividades().find((a) => a.id === fr?.eventoId);
+    if (!ev) return sairAssistente();
+    const ja = pontuadosNaAtividade(ev.id);
+    const pessoas = pessoasAtivas().filter((p) => R.categoriasPontuaveis.includes(p.categoria));
+    const busca = S.normalizar(fr.busca || "");
+    const visiveis = pessoas.filter((p) => !busca || S.normalizar(p.nome).includes(busca));
+    const livres = visiveis.filter((p) => !ja.has(p.id));
+    const n = fr.presentes.size;
+
+    el.innerHTML = `
+      <div class="fm-assistente">
+        <div class="fm-topo-passo"><button type="button" class="btn-voltar" id="fmSairFreq">← Voltar para os eventos</button></div>
+        <section class="fm-freq-cab" style="--c:${tipos[ev.tipo].cor}">
+          <span class="fm-evento-ico">${tipos[ev.tipo].icone}</span>
+          <div><small>${tiposAtividade[ev.tipo].nome} · ${dataBr(ev.data)}</small><h1>${esc(ev.titulo)}</h1><p class="muted">${fmt(ev.pontos)} Savacoins para cada presente · ${fmt(ja.size)} já registrado(s)</p></div>
+        </section>
+        <div class="fm-freq-ferramentas">
+          <input type="search" id="fmBusca" placeholder="Buscar pelo nome…" value="${esc(fr.busca || "")}" />
+          <button type="button" class="btn btn-ghost" id="fmMarcarTodos">${livres.length && livres.every((p) => fr.presentes.has(p.id)) ? "Desmarcar todos" : "Marcar todos"}</button>
+        </div>
+        <div class="fm-equipe fm-freq-grade">
+          ${visiveis
+            .map((p) => {
+              const feito = ja.has(p.id);
+              const sel = fr.presentes.has(p.id);
+              return `<button type="button" class="fm-pessoa ${feito ? "feito" : ""} ${sel ? "sel" : ""}" data-presente="${esc(p.id)}" ${feito ? "disabled" : ""}>
+                ${fotoOuIniciais(p)}<b>${esc(nomeBonito(p.nome))}</b>
+                <span class="fm-check" aria-hidden="true">${feito ? "✓ Registrado" : sel ? "✓ Presente" : ""}</span>
+              </button>`;
+            })
+            .join("") || `<p class="muted">Ninguém encontrado.</p>`}
+        </div>
+        <div class="fm-barra-salvar">
+          <span><b>${fmt(n)}</b> ${n === 1 ? "presente marcado" : "presentes marcados"}</span>
+          <button type="button" class="fm-comecar" id="fmSalvarFreq" ${n ? "" : "disabled"}>Salvar frequência</button>
+        </div>
+      </div>`;
+
+    $("#fmSairFreq", el).addEventListener("click", sairAssistente);
+    const busca$ = $("#fmBusca", el);
+    busca$.addEventListener("input", () => {
+      fr.busca = busca$.value;
+      renderFrequencia(el);
+      const novo = $("#fmBusca", el);
+      novo.focus();
+      novo.setSelectionRange(novo.value.length, novo.value.length);
+    });
+    $("#fmMarcarTodos", el).addEventListener("click", () => {
+      const todos = livres.every((p) => fr.presentes.has(p.id));
+      livres.forEach((p) => (todos ? fr.presentes.delete(p.id) : fr.presentes.add(p.id)));
+      renderFrequencia(el);
+    });
+    $$("[data-presente]", el).forEach((b) =>
+      b.addEventListener("click", () => {
+        const id = b.dataset.presente;
+        fr.presentes.has(id) ? fr.presentes.delete(id) : fr.presentes.add(id);
+        renderFrequencia(el);
+      }),
+    );
+    $("#fmSalvarFreq", el).addEventListener("click", async () => {
+      const ciclo = S.cicloDaData(ev.data);
+      const ids = [...fr.presentes];
+      const limite = ev.tipo === "felicidade" ? ciclo?.tetoFelicidade : ev.tipo === "evento" ? ciclo?.tetoEventos : null;
+      const acima = limite ? ids.filter((id) => somaNoCiclo(ev.tipo, id, ciclo) + ev.pontos > limite) : [];
+      if (acima.length && !(await confirmar({ titulo: "Atenção ao teto do ciclo", mensagem: `${acima.length} pessoa(s) passariam do teto de ${fmt(limite)} Savacoins no ciclo.`, acao: "Registrar mesmo assim" }))) return;
+      const r = await executar(() => S.registrarLancamento({ tipo: ev.tipo, atividadeId: ev.id, pessoas: ids.map((id) => ({ id, pontos: ev.pontos })) }), {
+        carregando: "Salvando frequência…",
+        concluido: "Frequência salva",
+        detalhe: `${esc(ev.titulo)}<br><b>${ids.length} ${ids.length === 1 ? "pessoa pontuada" : "pessoas pontuadas"}</b>`,
+      });
+      if (!r.ok) return;
+      fr.presentes = new Set();
+      renderFrequencia(el);
+    });
   }
 
   // ---------------- Lançamentos (eventos + lançar/avaliar + histórico) ----------------
@@ -849,7 +1218,7 @@
 
   // Histórico completo: aberto pelo botão "Histórico" da aba Eventos.
   function renderHistoricoAba(el) {
-    el.innerHTML = `<div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarEventos">← Voltar para eventos</button></div><div id="histCorpo"></div>`;
+    el.innerHTML = `<div class="lanc-voltar"><button type="button" class="btn-voltar" id="voltarEventos">← Voltar para eventos</button></div><div id="histCorpo"></div>`;
     $("#voltarEventos", el).addEventListener("click", () => {
       state.lanc.aba = "eventos";
       render();
@@ -901,7 +1270,7 @@
       return renderLancamentos(el);
     }
     el.innerHTML = `
-      ${modoFormulario() && state.formUnico ? "" : `<div class="lanc-voltar"><button type="button" class="btn btn-ghost btn-sm" id="voltarLanc">← Voltar para ${modoFormulario() ? "os formulários" : "lançamentos"}</button></div>`}
+      <div class="lanc-voltar"><button type="button" class="btn-voltar" id="voltarLanc">← Voltar para ${evento ? "eventos" : "lançamentos"}</button></div>
       ${cabecalhoLancamento(tipo, evento)}
       <form class="card form-card" id="lancForm" novalidate></form>
       ${evento ? `<div id="lancFeitos"></div>` : ""}`;
@@ -929,6 +1298,16 @@
         ? [["Bônus", `${fmt(R.pontosIndicacao)} Savacoins`], ["Quem recebe", "Advogados"]]
         : [];
     const admin = state.usuario.perfil === "admin";
+    if (["avaliacao", "indicacao"].includes(tipo))
+      return `
+      <header class="lanc-cab">
+        <div>
+          <span class="type-tag" style="--c:${t.cor}">${t.icone} ${evento ? tiposAtividade[tipo].curto : "Lançamento avulso"}</span>
+          <h2>${esc(evento ? evento.titulo : t.nome)}</h2>
+          ${dados.length ? `<p class="lanc-cab-meta">${dados.map(([k, v]) => `<span>${k} <b>${v}</b></span>`).join("")}</p>` : `<p class="lanc-cab-meta"><span>${esc(t.desc)}</span></p>`}
+        </div>
+        ${tipo === "avaliacao" && admin ? `<button type="button" class="btn btn-ghost btn-sm" id="editarModelo">${ico("editar")} Editar perguntas</button>` : ""}
+      </header>`;
     return `
       <section class="ev-banner" style="--c:${t.cor}">
         <span class="ev-banner-ico">${t.icone}</span>
@@ -1358,8 +1737,8 @@
           )
           .join("")}
       </div>
-      <label class="field field-full"><span>Mensagem de feedback para o colaborador</span><textarea name="feedback" rows="3" placeholder="O que foi muito bem e o que pode melhorar no período"></textarea></label>
-      <label class="field field-full"><span>Merece algum destaque especial? Descreva</span><textarea name="destaque" rows="2"></textarea></label>`;
+      <label class="field field-full"><span>${PERGUNTAS_ABERTAS.feedback}</span><textarea name="feedback" rows="3"></textarea></label>
+      <label class="field field-full"><span>${PERGUNTAS_ABERTAS.destaque}</span><textarea name="destaque" rows="2"></textarea></label>`;
   }
 
   function ligarQuestionario(form, tipo, evento) {
@@ -1537,16 +1916,17 @@
     let n = 0;
 
     el.innerHTML = `
-      <section class="ev-banner" style="--c:${tipos.avaliacao.cor}">
-        <span class="ev-banner-ico">${tipos.avaliacao.icone}</span>
-        <div class="ev-banner-txt"><small>Ciclo de avaliação</small><h2>Modelo do questionário</h2><p>Organize as perguntas por área. Cada área conta para o grupo Técnico ou Socioemocional (que definem os selos), e cada pergunta tem 4 níveis de resposta com os Savacoins de cada um.</p></div>
-        <dl class="ev-banner-dados">
-          <div><dt>Perguntas</dt><dd>${m.perguntas.length}</dd></div>
-          <div><dt>Técnico (máx.)</dt><dd>${fmt(maxGrupo("tecnica"))}</dd></div>
-          <div><dt>Socioemocional (máx.)</dt><dd>${fmt(maxGrupo("socio"))}</dd></div>
-          <div><dt>Total (máx.)</dt><dd>${fmt(maxGrupo("tecnica") + maxGrupo("socio"))}</dd></div>
-        </dl>
-      </section>
+      <header class="lanc-cab">
+        <div>
+          <h2>Modelo do questionário</h2>
+          <p class="lanc-cab-meta">
+            <span>Perguntas <b>${m.perguntas.length}</b></span>
+            <span>Técnico (máx.) <b>${fmt(maxGrupo("tecnica"))}</b></span>
+            <span>Socioemocional (máx.) <b>${fmt(maxGrupo("socio"))}</b></span>
+            <span>Total (máx.) <b>${fmt(maxGrupo("tecnica") + maxGrupo("socio"))}</b></span>
+          </p>
+        </div>
+      </header>
       <div class="modelo-topo">
         <div class="seg" role="tablist">${R.categoriasPontuaveis.map((c) => `<button type="button" data-mcat="${c}" class="${ed.cat === c ? "active" : ""}">${R.categorias[c]}</button>`).join("")}</div>
         <span class="muted small">As mudanças valem para as próximas avaliações; as já registradas não mudam.</span>
