@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const express = require("express");
 const R = require("./regras");
 const db = require("./db");
@@ -366,6 +367,160 @@ async function salvarPessoa(req, res) {
 
 rotas.post("/pessoas", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 rotas.put("/pessoas/:id", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
+
+// ---------- Importação da equipe por planilha (Colaboradores) ----------
+// Recebe as linhas já lidas da planilha (o navegador lê o .xlsx) e devolve o que vai mudar.
+// Com "aplicar: false" só simula (prévia); com "aplicar: true" grava tudo numa transação.
+// Regras: estagiários ficam de fora; coordenador ganha login de Coordenador (criado com senha
+// provisória quando o e-mail ainda não tem login); quem já está cadastrado é achado pelo nome
+// (o nome cadastrado não muda); quem não está na planilha pode ficar inativo.
+const semAcento = (v) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
+const nomeProprio = (n) =>
+  String(n).toLowerCase().replace(/(^|\s)(\S)/g, (m, e, l) => e + l.toUpperCase()).replace(/\s(Da|De|Do|Das|Dos|E)\s/g, (m) => m.toLowerCase());
+const senhaProvisoria = () => crypto.randomBytes(6).toString("base64").replace(/[+/=]/g, "x").slice(0, 8);
+
+function categoriaDaLinha(l) {
+  const cargo = semAcento(l.cargo);
+  const vinculo = semAcento(l.vinculo);
+  if (cargo.includes("ESTAGI") || vinculo.includes("ESTAGI")) return null;
+  if (semAcento(l.perfilEquipe).includes("COORDENADOR") || cargo.startsWith("COORDENADOR")) return "coord";
+  if (/\bRH\b|RECURSOS HUMANOS/.test(cargo)) return "rh";
+  if (vinculo.startsWith("OAB") || /ASSOCIAD|ADVOGAD|ASSESSOR JURIDICO/.test(cargo)) return "adv";
+  return "adm";
+}
+
+async function importarEquipe(req, res) {
+  const b = req.body || {};
+  const linhas = Array.isArray(b.linhas) ? b.linhas.slice(0, 2000) : [];
+  if (!linhas.length) throw new ErroDeUso("A planilha não tem nenhuma linha com NOME.");
+  const aplicar = b.aplicar === true;
+  const desativarAusentes = b.desativarAusentes === true;
+
+  const resultado = await transacao(async (c) => {
+    const pessoas = (await c.query("SELECT id, nome, categoria, ativo, coordenador_id FROM pessoas")).rows;
+    const usuarios = (await c.query("SELECT id, nome, email, perfil, ativo FROM usuarios")).rows;
+    const r = { novos: [], atualizados: [], iguais: 0, desativados: [], loginsNovos: [], ignorados: [], avisos: [], senhas: [] };
+    const usadas = new Set();
+    const vistos = new Set();
+
+    // Acha o cadastro pelo nome: igual, ou um nome contido no outro ("DAVI DE ASSIS" ↔ "DAVI DE ASSIS PINHEIRO DA SILVA").
+    const acharPessoa = (nome) => {
+      const n = normalizar(nome);
+      const livre = pessoas.filter((p) => !usadas.has(p.id));
+      const igual = livre.find((p) => normalizar(p.nome) === n);
+      if (igual) return igual;
+      const parecidos = livre.filter((p) => {
+        const m = normalizar(p.nome);
+        return n.startsWith(`${m} `) || m.startsWith(`${n} `);
+      });
+      return parecidos.length === 1 ? parecidos[0] : null;
+    };
+
+    // Linhas válidas, sem repetição.
+    const itens = [];
+    for (const l of linhas) {
+      const nome = texto(l.nome, 160).toUpperCase().replace(/\s+/g, " ");
+      if (!nome) continue;
+      const chave = normalizar(nome);
+      if (vistos.has(chave)) {
+        r.avisos.push(`${nomeProprio(nome)} aparece mais de uma vez na planilha; valeu a primeira linha.`);
+        continue;
+      }
+      vistos.add(chave);
+      const categoria = categoriaDaLinha(l);
+      const pessoa = acharPessoa(nome);
+      if (pessoa) usadas.add(pessoa.id);
+      if (!categoria) {
+        r.ignorados.push({ nome: nomeProprio(nome), motivo: "Estagiário (fica fora da Jornada)" });
+        continue;
+      }
+      itens.push({
+        nome, categoria, pessoa,
+        ativo: !semAcento(l.status).startsWith("INATIV"),
+        email: texto(l.email, 200).toLowerCase(),
+        coordNome: normalizar(l.coordenador || ""),
+        coordEmail: texto(l.emailCoordenador, 200).toLowerCase(),
+      });
+    }
+
+    // Logins dos coordenadores: pelo e-mail; sem e-mail, por um login de Coordenador com o mesmo nome.
+    const loginPorEmail = new Map();
+    const loginPorNome = new Map();
+    const jaAvisados = new Set();
+    for (const it of itens.filter((i) => i.categoria === "coord")) {
+      let u = it.email ? usuarios.find((x) => x.email === it.email) : usuarios.find((x) => x.perfil === "lider" && normalizar(x.nome) === normalizar(it.nome));
+      if (u && u.perfil !== "lider") {
+        r.avisos.push(`${nomeProprio(it.nome)}: o login ${u.email} tem outro perfil no sistema e não foi transformado em Coordenador.`);
+        jaAvisados.add(normalizar(it.nome));
+        continue;
+      }
+      if (!u && !it.email) {
+        r.avisos.push(`${nomeProprio(it.nome)} está sem e-mail na planilha: o login de Coordenador não foi criado e a equipe dele fica sem coordenador.`);
+        jaAvisados.add(normalizar(it.nome));
+        continue;
+      }
+      if (!u) {
+        u = { id: aplicar ? uid("u") : `novo:${it.email}`, nome: nomeProprio(it.nome), email: it.email, perfil: "lider", ativo: true };
+        r.loginsNovos.push({ nome: u.nome, email: u.email });
+        if (aplicar) {
+          const senha = senhaProvisoria();
+          await c.query("INSERT INTO usuarios (id, nome, email, perfil, senha_hash, trocar_senha) VALUES ($1, $2, $3, 'lider', $4, TRUE)", [u.id, u.nome, u.email, await gerarHash(senha)]);
+          r.senhas.push({ nome: u.nome, email: u.email, senha });
+        }
+        usuarios.push(u);
+      } else if (!u.ativo) {
+        r.avisos.push(`O login de ${u.nome} (${u.email}) está bloqueado em Equipe e acessos; desbloqueie para ele avaliar.`);
+      }
+      if (u.email) loginPorEmail.set(u.email, u.id);
+      loginPorNome.set(normalizar(it.nome), u.id);
+    }
+
+    const nomeDoLogin = (id) => usuarios.find((u) => u.id === id)?.nome || "";
+    const semCoord = new Set();
+    for (const it of itens) {
+      let coordenadorId = null;
+      if (R.categoriasPontuaveis.includes(it.categoria)) {
+        coordenadorId = loginPorEmail.get(it.coordEmail) || loginPorNome.get(it.coordNome) || null;
+        if (!coordenadorId && !it.coordEmail && it.coordNome) {
+          const u = usuarios.find((x) => x.perfil === "lider" && normalizar(x.nome) === it.coordNome);
+          coordenadorId = u?.id || null;
+        }
+        if (!coordenadorId && (it.coordNome || it.coordEmail) && !jaAvisados.has(it.coordNome)) semCoord.add(it.coordNome || it.coordEmail);
+      }
+      const p = it.pessoa;
+      if (!p) {
+        r.novos.push({ nome: nomeProprio(it.nome), categoria: R.categorias[it.categoria], coordenador: nomeDoLogin(coordenadorId), ativo: it.ativo });
+        if (aplicar)
+          await c.query("INSERT INTO pessoas (id, nome, categoria, coordenador_id, ativo, origem) VALUES ($1, $2, $3, $4, $5, 'planilha')", [uid("p"), it.nome, it.categoria, coordenadorId, it.ativo]);
+        continue;
+      }
+      const mudancas = [];
+      if (p.categoria !== it.categoria) mudancas.push(`perfil: ${R.categorias[p.categoria] || "sem perfil"} → ${R.categorias[it.categoria]}`);
+      if ((p.coordenador_id || null) !== coordenadorId) mudancas.push(`coordenador: ${nomeDoLogin(p.coordenador_id) || "nenhum"} → ${nomeDoLogin(coordenadorId) || "nenhum"}`);
+      if (p.ativo !== it.ativo) mudancas.push(it.ativo ? "reativado" : "inativado");
+      if (!mudancas.length) {
+        r.iguais++;
+        continue;
+      }
+      r.atualizados.push({ nome: nomeProprio(p.nome), mudancas });
+      if (aplicar)
+        await c.query("UPDATE pessoas SET categoria = $2, coordenador_id = $3, ativo = $4 WHERE id = $1", [p.id, it.categoria, coordenadorId, it.ativo]);
+    }
+    semCoord.forEach((n) => r.avisos.push(`Coordenador “${nomeProprio(n)}” não tem login de Coordenador: a equipe dele ficou sem coordenador.`));
+
+    if (desativarAusentes) {
+      const fora = pessoas.filter((p) => !usadas.has(p.id) && p.ativo && p.categoria !== "sistema");
+      r.desativados = fora.map((p) => nomeProprio(p.nome));
+      if (aplicar && fora.length) await c.query("UPDATE pessoas SET ativo = FALSE WHERE id = ANY($1)", [fora.map((p) => p.id)]);
+    }
+    if (aplicar) await tocar(c);
+    return r;
+  });
+  if (aplicar) avisarTodos();
+  res.json(resultado);
+}
+
+rotas.post("/pessoas/importar", auth.exigir("admin"), assincrono(importarEquipe));
 
 // ---------- Foto do colaborador ----------
 const TIPOS_FOTO = { "image/png": true, "image/webp": true, "image/jpeg": true };

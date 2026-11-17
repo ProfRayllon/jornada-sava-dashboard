@@ -823,3 +823,24 @@ body.topo-escuro .menu-btn { color: #f3efe6; }
 .lanc-aba.active .lanc-aba-ico { background: var(--charcoal); color: var(--gold); }
 .lanc-aba-txt strong { display: block; font-size: 0.92rem; }
 .lanc-aba-txt small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.74rem; }
+
+/* Importação da equipe por planilha */
+.imp-ajuda p { margin: 0 0 6px; font-size: 0.86rem; }
+.imp-ajuda ul { margin: 0; padding-left: 18px; display: grid; gap: 3px; }
+.check { display: flex; align-items: center; gap: 10px; font-size: 0.86rem; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--gold-deep); }
+.imp-numeros { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.imp-numeros div { padding: 12px; border: 1px solid var(--line); border-radius: 12px; text-align: center; }
+.imp-numeros b { display: block; font-size: 1.4rem; }
+.imp-numeros small { color: var(--muted); font-size: 0.74rem; }
+.imp-avisos { margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; background: rgba(212, 178, 111, 0.14); font-size: 0.82rem; }
+.imp-avisos p { margin: 4px 0; }
+.imp-grupo { margin: 0 0 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; font-size: 0.84rem; }
+.imp-grupo summary { cursor: pointer; }
+.imp-grupo ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; max-height: 240px; overflow: auto; }
+.imp-grupo.perigo { border-color: rgba(157, 40, 36, 0.45); }
+.imp-grupo.neutro { opacity: 0.8; }
+.imp-senhas { margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--gold); border-radius: 12px; }
+.imp-senhas p { margin: 0 0 8px; font-size: 0.84rem; }
+.imp-senhas code { font-size: 0.9rem; font-weight: 700; letter-spacing: 0.04em; }
+@media (max-width: 560px) { .imp-numeros { grid-template-columns: repeat(2, 1fr); } }

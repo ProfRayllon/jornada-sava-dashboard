@@ -187,6 +187,13 @@
     return db?.pessoas || [];
   }
 
+  // Importação da equipe por planilha: "aplicar: false" devolve só a prévia.
+  async function importarEquipe(linhas, { aplicar = false, desativarAusentes = false } = {}) {
+    const r = await api("pessoas/importar", { metodo: "POST", corpo: { linhas, aplicar, desativarAusentes } });
+    if (aplicar) await aposEscrita();
+    return r;
+  }
+
   async function salvarPessoa(dados) {
     const { pessoa } = await api(dados.id ? `pessoas/${encodeURIComponent(dados.id)}` : "pessoas", {
       metodo: dados.id ? "PUT" : "POST",
@@ -453,6 +460,7 @@
     salvarUsuario,
     listarPessoas,
     salvarPessoa,
+    importarEquipe,
     excluirPessoa,
     fotoUrl,
     prepararFoto,

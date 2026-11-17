@@ -1855,7 +1855,10 @@
       <div class="card">
         <div class="card-head">
           <div><h2>${lista.filter((p) => p.ativo).length} colaboradores ativos</h2><p class="muted">Pessoas que participam da Jornada e recebem pontuação.</p></div>
-          <button class="btn btn-gold" id="novaPessoa">+ Novo colaborador</button>
+          <div class="filters">
+            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="importarEquipe">${ico("subir")} Importar planilha</button>` : ""}
+            <button class="btn btn-gold" id="novaPessoa">+ Novo colaborador</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table class="table">
@@ -1879,8 +1882,174 @@
         </div>
       </div>`;
     $("#novaPessoa", el).addEventListener("click", () => formPessoa());
+    $("#importarEquipe", el)?.addEventListener("click", () => abrirImportacao());
     $$("[data-excluir-pessoa]", el).forEach((b) => b.addEventListener("click", () => excluirPessoa(b.dataset.excluirPessoa)));
     $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formPessoa(S.listarPessoas().find((p) => p.id === b.dataset.editar))));
+  }
+
+  // ---------------- Importação da equipe por planilha ----------------
+  // O navegador lê a planilha (SheetJS, carregado só quando precisa) e o servidor devolve a prévia;
+  // nada é gravado até o administrador confirmar.
+  const COLUNAS_IMPORTACAO = {
+    NOME: "nome",
+    OAB_VINCULO: "vinculo",
+    VINCULO: "vinculo",
+    CARGO: "cargo",
+    EMAIL: "email",
+    ID_EQUIPE: "equipe",
+    COORDENADOR_RESPONSAVEL: "coordenador",
+    COORDENADOR: "coordenador",
+    EMAIL_COORDENADOR: "emailCoordenador",
+    PERFIL_EQUIPE: "perfilEquipe",
+    STATUS: "status",
+  };
+
+  let carregandoXlsx = null;
+  function carregarXlsx() {
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    carregandoXlsx ||= new Promise((ok, falha) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+      s.onload = () => ok(window.XLSX);
+      s.onerror = () => {
+        carregandoXlsx = null;
+        falha(new Error("Não foi possível carregar o leitor de planilhas. Confira a internet e tente de novo."));
+      };
+      document.head.appendChild(s);
+    });
+    return carregandoXlsx;
+  }
+
+  async function lerPlanilhaEquipe(arquivo) {
+    const XLSX = await carregarXlsx();
+    const wb = XLSX.read(await arquivo.arrayBuffer(), { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const brutas = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false });
+    const chave = (h) => COLUNAS_IMPORTACAO[S.normalizar(h).replace(/[^A-Z0-9]+/g, "_").replace(/^_|_$/g, "")];
+    const linhas = brutas
+      .map((b) => {
+        const l = {};
+        Object.entries(b).forEach(([h, v]) => {
+          const k = chave(h);
+          if (k && !l[k]) l[k] = String(v ?? "").trim();
+        });
+        return l;
+      })
+      .filter((l) => l.nome);
+    if (!linhas.length) throw new Error("Não achei a coluna NOME na primeira aba da planilha (ou ela está vazia).");
+    return linhas;
+  }
+
+  function abrirImportacao() {
+    abrirModal(
+      "Importar equipe por planilha",
+      `<form class="form-grid" id="impForm" novalidate>
+        <div class="field-full imp-ajuda">
+          <p>Envie a planilha da equipe (.xlsx ou .csv) com as colunas <b>NOME</b>, <b>OAB / VINCULO</b>, <b>CARGO</b>, <b>EMAIL</b>, <b>COORDENADOR_RESPONSAVEL</b>, <b>EMAIL_COORDENADOR</b>, <b>PERFIL_EQUIPE</b> e <b>STATUS</b>.</p>
+          <ul class="muted small">
+            <li>Quem já está cadastrado é reconhecido pelo nome; quem não está é criado.</li>
+            <li>Com OAB ou cargo de associado: Advogados Associados. Demais (CLT etc.): Controladoria e Administrativo.</li>
+            <li>PERFIL_EQUIPE = COORDENADOR ganha login de Coordenador (senha provisória) e passa a avaliar a equipe.</li>
+            <li>Estagiários ficam de fora da Jornada.</li>
+          </ul>
+        </div>
+        <label class="field field-full"><span>Planilha</span><input type="file" name="arquivo" accept=".xlsx,.xls,.csv" required /></label>
+        <label class="check field-full"><input type="checkbox" name="desativar" /> <span>Deixar <b>inativos</b> os colaboradores que não estão na planilha</span></label>
+        <p class="form-error field-full" id="impErro"></p>
+        <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Ver prévia</button></div>
+      </form>`,
+    );
+    const form = $("#impForm");
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const arquivo = form.elements.namedItem("arquivo").files[0];
+      const desativarAusentes = form.elements.namedItem("desativar").checked;
+      if (!arquivo) return ($("#impErro").textContent = "Escolha a planilha.");
+      $("#impErro").textContent = "";
+      const botao = form.querySelector('button[type="submit"]');
+      botao.disabled = true;
+      botao.textContent = "Lendo planilha…";
+      try {
+        const linhas = await lerPlanilhaEquipe(arquivo);
+        const previa = await S.importarEquipe(linhas, { desativarAusentes });
+        mostrarPreviaImportacao(linhas, desativarAusentes, previa, arquivo.name);
+      } catch (erro) {
+        $("#impErro").textContent = erro.message;
+        botao.disabled = false;
+        botao.textContent = "Ver prévia";
+      }
+    });
+  }
+
+  function listaImportacao(titulo, itens, classe = "") {
+    if (!itens.length) return "";
+    return `<details class="imp-grupo ${classe}" ${itens.length <= 8 ? "open" : ""}>
+      <summary><b>${fmt(itens.length)}</b> ${titulo}</summary>
+      <ul>${itens.map((i) => `<li>${i}</li>`).join("")}</ul>
+    </details>`;
+  }
+
+  function resumoImportacao(r) {
+    return `
+      <div class="imp-numeros">
+        <div><b>${fmt(r.novos.length)}</b><small>novos</small></div>
+        <div><b>${fmt(r.atualizados.length)}</b><small>atualizados</small></div>
+        <div><b>${fmt(r.iguais)}</b><small>sem mudança</small></div>
+        <div><b>${fmt(r.desativados.length)}</b><small>inativados</small></div>
+      </div>
+      ${r.avisos.length ? `<div class="imp-avisos">${r.avisos.map((a) => `<p>⚠ ${esc(a)}</p>`).join("")}</div>` : ""}
+      ${listaImportacao("colaborador(es) novo(s)", r.novos.map((n) => `<b>${esc(n.nome)}</b> · ${esc(n.categoria)}${n.coordenador ? ` · coord. ${esc(n.coordenador)}` : ""}${n.ativo ? "" : " · inativo"}`))}
+      ${listaImportacao("colaborador(es) atualizado(s)", r.atualizados.map((a) => `<b>${esc(a.nome)}</b> · ${a.mudancas.map(esc).join(" · ")}`))}
+      ${listaImportacao("login(s) de Coordenador a criar", r.loginsNovos.map((l) => `<b>${esc(l.nome)}</b> · ${esc(l.email)}`))}
+      ${listaImportacao("colaborador(es) ficam inativos (não estão na planilha)", r.desativados.map(esc), "perigo")}
+      ${listaImportacao("linha(s) ignorada(s)", r.ignorados.map((i) => `<b>${esc(i.nome)}</b> · ${esc(i.motivo)}`), "neutro")}`;
+  }
+
+  function mostrarPreviaImportacao(linhas, desativarAusentes, previa, arquivo) {
+    const nada = !previa.novos.length && !previa.atualizados.length && !previa.desativados.length && !previa.loginsNovos.length;
+    abrirModal(
+      "Prévia da importação",
+      `<p class="muted small">${esc(arquivo)} · ${fmt(linhas.length)} linha(s). Nada foi gravado ainda.</p>
+      ${resumoImportacao(previa)}
+      <div class="form-actions"><button class="btn btn-ghost" type="button" id="impVoltar">Voltar</button>${nada ? `<button class="btn btn-gold" type="button" data-close>Fechar (nada a mudar)</button>` : `<button class="btn btn-gold" type="button" id="impConfirmar">Confirmar importação</button>`}</div>`,
+    );
+    $("#impVoltar").addEventListener("click", abrirImportacao);
+    $("#impConfirmar")?.addEventListener("click", async () => {
+      const r = await executar(() => S.importarEquipe(linhas, { aplicar: true, desativarAusentes }), {
+        carregando: "Importando equipe…",
+        concluido: "Equipe importada",
+        detalhe: (x) => `${fmt(x.novos.length)} novo(s) · ${fmt(x.atualizados.length)} atualizado(s) · ${fmt(x.desativados.length)} inativado(s)`,
+      });
+      if (!r.ok) return;
+      mostrarResultadoImportacao(r.resultado);
+      render();
+    });
+  }
+
+  function mostrarResultadoImportacao(r) {
+    abrirModal(
+      "Equipe importada",
+      `${r.senhas.length
+        ? `<div class="imp-senhas">
+            <p><b>Logins de Coordenador criados.</b> Anote ou copie agora: as senhas provisórias não aparecem de novo. No primeiro acesso, o sistema pede a troca.</p>
+            <table class="table"><thead><tr><th>Coordenador</th><th>E-mail</th><th>Senha provisória</th></tr></thead><tbody>
+              ${r.senhas.map((s) => `<tr><td>${esc(s.nome)}</td><td>${esc(s.email)}</td><td><code>${esc(s.senha)}</code></td></tr>`).join("")}
+            </tbody></table>
+            <button class="btn btn-ghost btn-sm" type="button" id="impCopiar">Copiar logins e senhas</button>
+          </div>`
+        : ""}
+      ${resumoImportacao({ ...r, loginsNovos: [] })}
+      <div class="form-actions"><button class="btn btn-gold" type="button" data-close>Concluir</button></div>`,
+    );
+    $("#impCopiar")?.addEventListener("click", async () => {
+      const txt = r.senhas.map((s) => `${s.nome}\t${s.email}\t${s.senha}`).join("\n");
+      try {
+        await navigator.clipboard.writeText(txt);
+        $("#impCopiar").textContent = "Copiado ✓";
+      } catch (e) {
+        $("#impCopiar").textContent = "Não deu para copiar; selecione a tabela";
+      }
+    });
   }
 
   // Exclusão definitiva (só administrador). Avisa quantos lançamentos com pontos da pessoa serão afetados.
