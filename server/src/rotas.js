@@ -172,8 +172,9 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
   res.json({ eu: req.usuario, usuarios, coordenadores, modeloAvaliacao, ...tudo });
 }));
 
-// Cadastro de ciclos (só administrador). Não podem se sobrepor; os ciclos ligados às planilhas
-// (2025 e 2026) mantêm as datas, porque a base delas é do ano inteiro.
+// Cadastro de ciclos (só administrador). Não podem se sobrepor. As datas de qualquer ciclo podem
+// mudar (ex.: encurtar a "Jornada 2026" para abrir um ciclo novo dentro de 2026), desde que nenhum
+// evento ou lançamento já feito fique fora de todos os ciclos.
 const dataValida = (d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || "")) && !Number.isNaN(Date.parse(d));
 
 async function salvarCiclo(req, res) {
@@ -189,12 +190,24 @@ async function salvarCiclo(req, res) {
     const todos = await lerCiclos(c);
     const atual = id ? todos.find((ci) => ci.id === id) : null;
     if (id && !atual) throw new ErroDeUso("Ciclo não encontrado.", 404);
-    const inicio = atual?.anoBase ? atual.inicio : String(b.inicio || "");
-    const fim = atual?.anoBase ? atual.fim : String(b.fim || "");
+    const inicio = String(b.inicio || "");
+    const fim = String(b.fim || "");
     if (!dataValida(inicio) || !dataValida(fim)) throw new ErroDeUso("Informe o início e o fim do ciclo.");
     if (fim < inicio) throw new ErroDeUso("O fim do ciclo precisa ser depois do início.");
     const choque = todos.find((ci) => ci.id !== id && inicio <= ci.fim && fim >= ci.inicio);
-    if (choque) throw new ErroDeUso(`O período choca com o ciclo “${choque.nome}”. Ajuste as datas de um dos dois.`);
+    if (choque) throw new ErroDeUso(`O período choca com o ciclo “${choque.nome}”. Edite as datas dele antes (ex.: encurte o ciclo) e cadastre este depois.`);
+    if (atual && (inicio > atual.inicio || fim < atual.fim)) {
+      // Encurtou: tudo o que estava no período antigo precisa continuar dentro de algum ciclo.
+      const novos = [...todos.filter((ci) => ci.id !== id), { inicio, fim }];
+      const { rows } = await c.query(
+        `SELECT dados->>'data' AS data FROM lancamentos WHERE dados->>'data' BETWEEN $1 AND $2
+         UNION SELECT data FROM atividades WHERE data BETWEEN $1 AND $2`,
+        [atual.inicio, atual.fim],
+      );
+      const fora = rows.map((r) => r.data).filter((d) => d && !cicloDaData(novos, d)).sort();
+      if (fora.length)
+        throw new ErroDeUso(`Há eventos ou lançamentos em ${fora[0].split("-").reverse().join("/")} que ficariam fora de todos os ciclos. Ajuste as datas para cobri-los.`);
+    }
 
     const r = id
       ? await c.query("UPDATE ciclos SET nome = $2, inicio = $3, fim = $4, teto_felicidade = $5, teto_eventos = $6 WHERE id = $1 RETURNING *", [id, nome, inicio, fim, tetoFelicidade, tetoEventos])

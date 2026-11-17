@@ -555,14 +555,13 @@
 
   function formCiclo(c = null) {
     const sug = c ? null : proximoSemestre();
-    const travado = Boolean(c?.anoBase);
     abrirModal(
       c ? "Editar ciclo" : "Novo ciclo",
       `<form class="form-grid" id="cicloForm" novalidate>
         <label class="field field-full"><span>Nome do ciclo</span><input name="nome" required value="${esc(c?.nome || sug.nome)}" placeholder="Ex.: 1º semestre de 2027" /></label>
-        <label class="field"><span>Início</span><input type="date" name="inicio" required value="${c?.inicio || sug.inicio}" ${travado ? "disabled" : ""} /></label>
-        <label class="field"><span>Fim</span><input type="date" name="fim" required value="${c?.fim || sug.fim}" ${travado ? "disabled" : ""} /></label>
-        ${travado ? `<p class="muted small field-full">As datas deste ciclo vêm da base das planilhas (ano inteiro) e não podem mudar.</p>` : ""}
+        <label class="field"><span>Início</span><input type="date" name="inicio" required value="${c?.inicio || sug.inicio}" /></label>
+        <label class="field"><span>Fim</span><input type="date" name="fim" required value="${c?.fim || sug.fim}" /></label>
+        ${c?.anoBase ? `<p class="muted small field-full">A pontuação das planilhas de ${c.anoBase} continua neste ciclo mesmo que as datas mudem. Para abrir outro ciclo dentro de ${c.anoBase}, encurte este primeiro.</p>` : ""}
         <label class="field"><span>Teto do Programa de Felicidade</span><input type="number" name="tetoFelicidade" min="0" step="25" value="${c?.tetoFelicidade ?? R.maxFelicidadeAno}" /><small class="field-hint">Savacoins por pessoa no ciclo. Quem atinge ganha o selo “Sou feliz!”.</small></label>
         <label class="field"><span>Teto de Eventos institucionais</span><input type="number" name="tetoEventos" min="0" step="25" value="${c?.tetoEventos ?? R.maxEventosAno}" /><small class="field-hint">Savacoins por pessoa no ciclo.</small></label>
         <p class="form-error field-full" id="cicloErro"></p>
@@ -583,8 +582,8 @@
         tetoEventos: Number(campo("tetoEventos").value),
       };
       if (!dados.nome) return ($("#cicloErro").textContent = "Dê um nome ao ciclo.");
-      if (!travado && (!dados.inicio || !dados.fim)) return ($("#cicloErro").textContent = "Informe o início e o fim.");
-      if (!travado && dados.fim < dados.inicio) return ($("#cicloErro").textContent = "O fim precisa ser depois do início.");
+      if (!dados.inicio || !dados.fim) return ($("#cicloErro").textContent = "Informe o início e o fim.");
+      if (dados.fim < dados.inicio) return ($("#cicloErro").textContent = "O fim precisa ser depois do início.");
       const r = await executar(() => S.salvarCiclo(dados), {
         carregando: "Salvando ciclo…",
         concluido: c ? "Ciclo atualizado" : "Ciclo cadastrado",
@@ -857,6 +856,7 @@
           <div><h2>Eventos · ${esc(ciclo?.nome || "sem ciclo")}</h2><p class="muted">${gerencia ? "Cadastre encontros, eventos, missões e ciclos de avaliação. Clique no olho para lançar os pontos ou avaliar." : "Clique no olho de um ciclo para avaliar os colaboradores."}</p></div>
           <div class="filters">
             ${seletorCiclo("eAno")}
+            ${state.usuario.perfil === "admin" ? `<button class="btn btn-ghost" id="eCiclos">${ico("eventos")} Ciclos</button><button class="btn btn-ghost" id="eNovoCiclo">+ Novo ciclo</button>` : ""}
             ${tiposVisiveis.length > 1 ? `<select id="eTipo" aria-label="Tipo de evento"><option value="all">Todos os tipos</option>${tiposVisiveis
               .map((id) => `<option value="${id}" ${f.tipo === id ? "selected" : ""}>${tiposAtividade[id].nome}</option>`)
               .join("")}</select>` : ""}
@@ -891,6 +891,8 @@
       </div>`;
 
     ligarSeletorCiclo(el, "eAno", renderEventos);
+    $("#eCiclos", el)?.addEventListener("click", abrirCiclos);
+    $("#eNovoCiclo", el)?.addEventListener("click", () => formCiclo());
     $("#eTipo", el)?.addEventListener("change", (e) => {
       f.tipo = e.target.value;
       renderEventos(el);
