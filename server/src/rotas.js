@@ -335,6 +335,22 @@ async function salvarUsuario(req, res) {
 rotas.post("/usuarios", auth.exigir("admin"), assincrono(salvarUsuario));
 rotas.put("/usuarios/:id", auth.exigir("admin"), assincrono(salvarUsuario));
 
+// Exclui um acesso. Os lançamentos e eventos que ele registrou continuam (o nome do autor fica
+// guardado no lançamento); a equipe de um coordenador excluído fica sem coordenador.
+rotas.delete("/usuarios/:id", auth.exigir("admin"), assincrono(async (req, res) => {
+  const id = req.params.id;
+  if (id === req.usuario.id) throw new ErroDeUso("Você não pode excluir o seu próprio acesso.");
+  await transacao(async (c) => {
+    const r = await c.query("DELETE FROM usuarios WHERE id = $1 RETURNING perfil", [id]);
+    if (!r.rowCount) throw new ErroDeUso("Usuário não encontrado.", 404);
+    const admins = await c.query("SELECT count(*)::int AS n FROM usuarios WHERE perfil = 'admin' AND ativo");
+    if (!admins.rows[0].n) throw new ErroDeUso("O sistema precisa de pelo menos um administrador ativo.");
+    await tocar(c);
+  });
+  avisarTodos();
+  res.json({ ok: true });
+}));
+
 // ---------- Pessoas avaliadas ----------
 async function salvarPessoa(req, res) {
   const b = req.body;

@@ -2557,6 +2557,21 @@
     return null;
   }
 
+  async function excluirUsuario(u) {
+    if (!u) return;
+    const equipe = avaliadosDe(u) || [];
+    const sim = await confirmar({
+      titulo: "Excluir acesso?",
+      mensagem: `<b>${esc(u.nome)}</b> (${esc(u.email)}) não vai mais conseguir entrar no sistema. Esta ação não pode ser desfeita.`,
+      detalhe: `${equipe.length ? `Os <b>${equipe.length} colaborador(es)</b> da equipe dele(a) ficam sem coordenador. ` : ""}As avaliações e lançamentos que ele(a) já registrou continuam no sistema. Para só bloquear a entrada, use <b>Editar</b> e desmarque “Acesso ativo”.`,
+      acao: "Excluir",
+      perigo: true,
+    });
+    if (!sim) return;
+    const r = await executar(() => S.excluirUsuario(u.id), { carregando: "Excluindo acesso…", concluido: "Acesso excluído", detalhe: esc(u.nome) });
+    if (r.ok) render();
+  }
+
   function abrirAvaliadosDe(u) {
     const lista = avaliadosDe(u) || [];
     const periodo = periodosAvaliacao()[0];
@@ -2608,7 +2623,7 @@
                   })()}</td>
                   <td>${esc(u.area || "—")}</td>
                   <td><span class="status ${u.ativo ? "on" : ""}">${u.ativo ? "Ativo" : "Bloqueado"}</span></td>
-                  <td><div class="row-actions">${btnEditar("data-editar", u.id)}</div></td>
+                  <td><div class="row-actions">${btnEditar("data-editar", u.id)}${u.id === state.usuario.id ? "" : btnExcluir("data-excluir-usuario", u.id)}</div></td>
                 </tr>`,
                 )
                 .join("")}
@@ -2617,6 +2632,7 @@
         </div>
       </div>`;
     $("#novoUsuario", el).addEventListener("click", () => formUsuario());
+    $$("[data-excluir-usuario]", el).forEach((b) => b.addEventListener("click", () => excluirUsuario(lista.find((u) => u.id === b.dataset.excluirUsuario))));
     $$("[data-avaliados]", el).forEach((b) => b.addEventListener("click", () => abrirAvaliadosDe(lista.find((u) => u.id === b.dataset.avaliados))));
     $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formUsuario(lista.find((u) => u.id === b.dataset.editar))));
   }

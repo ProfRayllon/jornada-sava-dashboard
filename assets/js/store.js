@@ -243,6 +243,11 @@
     await aposEscrita();
   }
 
+  async function excluirUsuario(id) {
+    await api(`usuarios/${encodeURIComponent(id)}`, { metodo: "DELETE" });
+    await aposEscrita();
+  }
+
   async function excluirPessoa(id) {
     const r = await api(`pessoas/${encodeURIComponent(id)}`, { metodo: "DELETE" });
     await aposEscrita();
@@ -462,6 +467,7 @@
     salvarPessoa,
     importarEquipe,
     excluirPessoa,
+    excluirUsuario,
     fotoUrl,
     prepararFoto,
     salvarFoto,
