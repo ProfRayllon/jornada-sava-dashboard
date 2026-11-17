@@ -585,6 +585,7 @@
         ${c?.anoBase ? `<p class="muted small field-full">A pontuação das planilhas de ${c.anoBase} continua neste ciclo mesmo que as datas mudem. Para abrir outro ciclo dentro de ${c.anoBase}, encurte este primeiro.</p>` : ""}
         <label class="field"><span>Teto do Programa de Felicidade</span><input type="number" name="tetoFelicidade" min="0" step="25" value="${c?.tetoFelicidade ?? R.maxFelicidadeAno}" /><small class="field-hint">Savacoins por pessoa no ciclo. Quem atinge ganha o selo “Sou feliz!”.</small></label>
         <label class="field"><span>Teto de Eventos institucionais</span><input type="number" name="tetoEventos" min="0" step="25" value="${c?.tetoEventos ?? R.maxEventosAno}" /><small class="field-hint">Savacoins por pessoa no ciclo.</small></label>
+        ${c ? "" : `<label class="check field-full"><input type="checkbox" name="abrirAvaliacao" checked /> <span>Abrir a <b>avaliação</b> deste ciclo para os coordenadores (aparece na tela deles quando o ciclo começar)</span></label>`}
         <p class="form-error field-full" id="cicloErro"></p>
         <div class="form-actions field-full"><button class="btn btn-ghost" type="button" id="cicloVoltar">Voltar</button><button class="btn btn-gold" type="submit">Salvar ciclo</button></div>
       </form>`,
@@ -601,6 +602,7 @@
         fim: campo("fim").value,
         tetoFelicidade: Number(campo("tetoFelicidade").value),
         tetoEventos: Number(campo("tetoEventos").value),
+        abrirAvaliacao: c ? undefined : campo("abrirAvaliacao").checked,
       };
       if (!dados.nome) return ($("#cicloErro").textContent = "Dê um nome ao ciclo.");
       if (!dados.inicio || !dados.fim) return ($("#cicloErro").textContent = "Informe o início e o fim.");

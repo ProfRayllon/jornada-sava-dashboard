@@ -213,6 +213,11 @@ async function salvarCiclo(req, res) {
     const r = id
       ? await c.query("UPDATE ciclos SET nome = $2, inicio = $3, fim = $4, teto_felicidade = $5, teto_eventos = $6 WHERE id = $1 RETURNING *", [id, nome, inicio, fim, tetoFelicidade, tetoEventos])
       : await c.query("INSERT INTO ciclos (id, nome, inicio, fim, teto_felicidade, teto_eventos) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *", [uid("c"), nome, inicio, fim, tetoFelicidade, tetoEventos]);
+    // Ciclo novo: já abre o período de avaliação para os coordenadores responderem.
+    if (!id && b.abrirAvaliacao !== false)
+      await c.query("INSERT INTO atividades (id, ano, tipo, titulo, data, pontos, descricao, autor_id) VALUES ($1, $2, 'avaliacao', $3, $4, NULL, '', $5)", [
+        uid("a"), Number(inicio.slice(0, 4)), `Avaliação · ${nome}`.slice(0, 200), inicio, req.usuario.id,
+      ]);
     await tocar(c);
     return cicloDoBanco(r.rows[0]);
   });
