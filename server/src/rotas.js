@@ -11,7 +11,7 @@ const rotas = express.Router();
 const PERFIS = ["admin", "rh", "lider"];
 const TIPOS_POR_PERFIL = {
   admin: ["felicidade", "evento", "avaliacao", "indicacao", "missao", "protagonista"],
-  rh: ["felicidade", "evento", "avaliacao", "indicacao", "missao", "protagonista"],
+  rh: ["felicidade", "evento", "indicacao", "missao", "protagonista"], // o RH lança a frequência dos eventos; quem avalia são os coordenadores
   lider: ["avaliacao", "protagonista"],
 };
 

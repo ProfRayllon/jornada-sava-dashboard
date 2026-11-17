@@ -49,7 +49,7 @@
 
   const perfis = {
     admin: { nome: "Administrador", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
-    rh: { nome: "RH", tipos: ["felicidade", "evento", "avaliacao", "indicacao", "missao"] },
+    rh: { nome: "RH", tipos: ["felicidade", "evento", "indicacao", "missao"] },
     lider: { nome: "Coordenador", tipos: ["avaliacao"] },
   };
 
@@ -761,11 +761,11 @@
     return url ? `<img class="fm-foto ${classe}" src="${url}" alt="" loading="lazy" />` : `<span class="fm-foto fm-iniciais ${classe}">${esc(iniciais(p.nome))}</span>`;
   };
 
-  // Equipe que o usuário avalia: a do coordenador; para o RH, quem está sem coordenador.
+  // Equipe que o coordenador avalia (o RH não avalia pessoas, só lança a frequência dos eventos).
   function equipeAvaliada() {
     const u = state.usuario;
     const ativos = pessoasAtivas().filter((p) => R.categoriasPontuaveis.includes(p.categoria));
-    return u.perfil === "lider" ? ativos.filter((p) => p.coordenadorId === u.id) : ativos.filter((p) => !p.coordenadorId);
+    return ativos.filter((p) => p.coordenadorId === u.id);
   }
 
   // Períodos de avaliação (eventos "Ciclo de avaliação") do ciclo vigente.
@@ -779,25 +779,18 @@
   function renderFormulario(el) {
     el.classList.add("form-modo-corpo");
     const f = fm();
-    if (state.usuario.perfil !== "rh") f.secao = "avaliacao";
+    f.secao = state.usuario.perfil === "rh" ? "frequencia" : "avaliacao";
     if (f.tela === "avaliar") return renderAssistente(el);
     if (f.tela === "frequencia") return renderFrequencia(el);
     if (f.tela === "fim") return renderFimAvaliacao(el);
-    const rh = state.usuario.perfil === "rh";
     el.innerHTML = `
       <section class="fm-hero">
         <p class="form-kicker">${esc(cicloAtual()?.nome || "Jornada SAVA")}</p>
         <h1>Olá, ${esc(nomeBonito(state.usuario.nome).split(" ")[0])}!</h1>
         <p class="muted">${f.secao === "avaliacao" ? "Escolha o período disponível e avalie a sua equipe." : "Escolha o evento e marque quem participou."}</p>
       </section>
-      ${rh
-        ? `<div class="fm-secoes" role="tablist">
-            <button type="button" data-secao="avaliacao" class="${f.secao === "avaliacao" ? "active" : ""}">${ico("avaliacao")}<span><b>Avaliações</b><small>Questionário dos colaboradores</small></span></button>
-            <button type="button" data-secao="frequencia" class="${f.secao === "frequencia" ? "active" : ""}">${ico("felicidade")}<span><b>Frequência dos eventos</b><small>Quem participou de cada evento</small></span></button>
-          </div>`
-        : ""}
+
       <div id="fmCorpo"></div>`;
-    $$("[data-secao]", el).forEach((b) => b.addEventListener("click", () => ((f.secao = b.dataset.secao), renderFormulario(el))));
     (f.secao === "frequencia" ? renderListaEventosRh : renderInicioAvaliacao)($("#fmCorpo", el));
   }
 
@@ -841,7 +834,7 @@
           .join("")}
       </div>
 
-      <h2 class="fm-titulo"><span>2</span> ${state.usuario.perfil === "lider" ? "Sua equipe" : "Colaboradores sem coordenador"}
+      <h2 class="fm-titulo"><span>2</span> Sua equipe
         ${pendentes.length > 1 ? `<button type="button" class="fm-link" id="fmTodos">${n === pendentes.length ? "Desmarcar todos" : "Selecionar todos"}</button>` : ""}</h2>
       ${equipe.length
         ? `<div class="fm-equipe">
@@ -2557,11 +2550,10 @@
   }
 
   // ---------------- Equipe ----------------
-  // Quem cada login avalia: a equipe do coordenador; o RH fica com quem está sem coordenador.
+  // Quem cada coordenador avalia (o RH não recebe colaboradores: cuida da frequência dos eventos).
   function avaliadosDe(u) {
     const ativos = pessoasAtivas().filter((p) => R.categoriasPontuaveis.includes(p.categoria));
     if (u.perfil === "lider") return ativos.filter((p) => p.coordenadorId === u.id);
-    if (u.perfil === "rh") return ativos.filter((p) => !p.coordenadorId);
     return null;
   }
 
@@ -2570,7 +2562,7 @@
     const periodo = periodosAvaliacao()[0];
     const feitos = periodo ? pontuadosNaAtividade(periodo.id) : new Map();
     abrirModal(
-      `${u.perfil === "rh" ? "Sem coordenador" : "Equipe de"} · ${esc(u.nome)}`,
+      `Equipe de ${esc(u.nome)}`,
       `<p class="muted small">${fmt(lista.length)} colaborador(es)${periodo ? ` · ${fmt(lista.filter((p) => feitos.has(p.id)).length)} avaliado(s) em “${esc(periodo.titulo)}”` : ""}. A equipe é definida em Colaboradores (campo Coordenador) ou pela importação da planilha.</p>
       <div class="avaliados-lista">${lista
         .map((p) => `<div class="avaliados-item">${S.fotoUrl(p) ? `<img class="pessoa-foto" src="${S.fotoUrl(p)}" alt="" />` : `<span class="avatar sm">${esc(iniciais(p.nome))}</span>`}
@@ -2594,15 +2586,10 @@
         </div>
         <div class="roles">
           <div><b>Administrador</b><small>Tudo, inclusive equipe e acessos.</small></div>
-          <div><b>RH</b><small>Presenças, eventos, missões, indicações, avaliações e cadastro de colaboradores.</small></div>
+          <div><b>RH</b><small>Frequência dos eventos: encontros, eventos institucionais e missões.</small></div>
           <div><b>Coordenador</b><small>Avaliações dos colaboradores ao longo do ano.</small></div>
         </div>
-        <div class="equipe-resumo">
-          <div><b>${fmt(pontuaveis.length)}</b><small>colaboradores na Jornada</small></div>
-          <div><b>${fmt(comCoord)}</b><small>com coordenador</small></div>
-          <div class="${pontuaveis.length - comCoord ? "alerta" : ""}"><b>${fmt(pontuaveis.length - comCoord)}</b><small>sem coordenador</small></div>
-          <div><b>${fmt(lideres.size)}</b><small>coordenadores</small></div>
-        </div>
+        <p class="equipe-resumo">${fmt(pontuaveis.length)} colaboradores na Jornada · ${fmt(comCoord)} com coordenador · <span class="${pontuaveis.length - comCoord ? "warn" : ""}">${fmt(pontuaveis.length - comCoord)} sem coordenador</span> · ${fmt(lideres.size)} coordenadores</p>
         <div class="table-wrap">
           <table class="table">
             <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th class="num">Avaliados</th><th>Área</th><th>Status</th><th></th></tr></thead>
@@ -2615,8 +2602,9 @@
                   <td>${perfis[u.perfil]?.nome || u.perfil}</td>
                   <td class="num">${(() => {
                     const av = avaliadosDe(u);
+                    if (u.perfil === "rh") return `<span class="muted">Eventos</span>`;
                     if (!av) return "—";
-                    return `<button type="button" class="avaliados-n ${av.length ? "" : "zero"}" data-avaliados="${esc(u.id)}" title="Ver quem ${esc(u.nome)} avalia">${fmt(av.length)}${u.perfil === "rh" ? " <small>sem coord.</small>" : ""}</button>`;
+                    return `<button type="button" class="avaliados-n ${av.length ? "" : "zero"}" data-avaliados="${esc(u.id)}" title="Ver quem ${esc(u.nome)} avalia">${fmt(av.length)}</button>`;
                   })()}</td>
                   <td>${esc(u.area || "—")}</td>
                   <td><span class="status ${u.ativo ? "on" : ""}">${u.ativo ? "Ativo" : "Bloqueado"}</span></td>

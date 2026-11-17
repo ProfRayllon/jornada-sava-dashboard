@@ -992,17 +992,12 @@ body.topo-escuro .menu-btn { color: #f3efe6; }
 .fm-placar.pulou { animation: fm-pulo 0.45s ease; }
 @keyframes fm-pulo { 40% { transform: scale(1.12); box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 35%, transparent); } }
 
-/* Equipe e acessos: quantos cada login avalia */
-.equipe-resumo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 4px 0 6px; }
-.equipe-resumo div { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
-.equipe-resumo b { display: block; font-size: 1.4rem; }
-.equipe-resumo small { color: var(--muted); font-size: 0.76rem; }
-.equipe-resumo .alerta { border-color: color-mix(in srgb, #d08a2e 55%, var(--line)); background: color-mix(in srgb, #d08a2e 10%, var(--surface)); }
-.avaliados-n { min-width: 44px; padding: 5px 12px; border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--line)); border-radius: 999px; background: color-mix(in srgb, var(--gold) 14%, var(--surface)); color: var(--ink); font: inherit; font-weight: 800; cursor: pointer; }
-.avaliados-n:hover { border-color: var(--gold-deep); }
-.avaliados-n.zero { border-color: color-mix(in srgb, #d08a2e 55%, var(--line)); background: color-mix(in srgb, #d08a2e 12%, var(--surface)); }
-.avaliados-n small { color: var(--muted); font-size: 0.7rem; font-weight: 600; }
+/* Equipe e acessos: quantos cada login avalia (discreto) */
+.equipe-resumo { margin: 2px 0 4px; color: var(--muted); font-size: 0.82rem; }
+.equipe-resumo .warn { color: #b26b12; font-weight: 700; }
+.avaliados-n { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; cursor: pointer; }
+.avaliados-n:hover { color: var(--gold-deep); text-decoration-color: currentColor; }
+.avaliados-n.zero { color: #b26b12; }
 .avaliados-lista { display: grid; gap: 8px; margin: 12px 0 16px; max-height: 420px; overflow: auto; }
 .avaliados-item { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 12px; }
 .avaliados-item small { display: block; color: var(--muted); font-size: 0.74rem; }
-@media (max-width: 760px) { .equipe-resumo { grid-template-columns: repeat(2, 1fr); } }
