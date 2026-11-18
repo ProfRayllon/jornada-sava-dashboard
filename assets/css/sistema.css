@@ -995,6 +995,9 @@ body.topo-escuro .menu-btn { color: #f3efe6; }
 /* Equipe e acessos: quantos cada login avalia (discreto) */
 .equipe-resumo { margin: 2px 0 4px; color: var(--muted); font-size: 0.82rem; }
 .equipe-resumo .warn { color: #b26b12; font-weight: 700; }
+.equipe-rodape { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.8rem; }
+.equipe-rodape .ico { width: 16px; height: 16px; flex: none; }
+.equipe-rodape code { color: var(--ink); font-weight: 700; }
 .avaliados-n { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; cursor: pointer; }
 .avaliados-n:hover { color: var(--gold-deep); text-decoration-color: currentColor; }
 .avaliados-n.zero { color: #b26b12; }

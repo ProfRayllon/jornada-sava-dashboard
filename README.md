@@ -134,7 +134,9 @@ npm run dev
 ```
 
 Defina `ADMIN_EMAIL` e `ADMIN_PASSWORD` no ambiente para a criação inicial.
-Não existe senha padrão; contas já existentes mantêm a senha cadastrada no banco.
+O administrador não tem senha padrão; contas já existentes mantêm a senha cadastrada no banco.
+Os acessos criados em Equipe e acessos (coordenadores etc.) e o botão "Resetar senha" usam a
+senha padrão `@senha123` (troque com `DEFAULT_USER_PASSWORD`), até existir a recuperação por e-mail.
 
 O `python -m http.server` não serve mais: sem a API, o login e os lançamentos não funcionam.
 

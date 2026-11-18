@@ -1,4 +1,4 @@
-const crypto = require("crypto");
+const config = require("./config");
 const express = require("express");
 const R = require("./regras");
 const db = require("./db");
@@ -170,7 +170,8 @@ rotas.get("/estado", auth.exigir(), assincrono(async (req, res) => {
     coordenadores = rows;
   }
   const modeloAvaliacao = await lerModeloAvaliacao();
-  res.json({ eu: req.usuario, usuarios, coordenadores, modeloAvaliacao, ...tudo });
+  const senhaPadrao = req.usuario.perfil === "admin" ? config.SENHA_PADRAO : undefined;
+  res.json({ eu: req.usuario, usuarios, coordenadores, modeloAvaliacao, senhaPadrao, ...tudo });
 }));
 
 // Cadastro de ciclos (só administrador). Não podem se sobrepor. As datas de qualquer ciclo podem
@@ -281,6 +282,7 @@ rotas.post("/sair", assincrono(async (req, res) => {
 rotas.post("/minha-senha", auth.exigir(), assincrono(async (req, res) => {
   const senha = String(req.body.senha || "");
   if (senha.length < 6) throw new ErroDeUso("Use pelo menos 6 caracteres.");
+  if (senha === config.SENHA_PADRAO) throw new ErroDeUso("Escolha uma senha diferente da senha padrão.");
   await pool.query("UPDATE usuarios SET senha_hash = $1, trocar_senha = FALSE WHERE id = $2", [await gerarHash(senha), req.usuario.id]);
   res.json({ ok: true });
 }));
@@ -294,7 +296,8 @@ async function salvarUsuario(req, res) {
   if (!nome || !email) throw new ErroDeUso("Preencha nome e e-mail.");
   if (!PERFIS.includes(b.perfil)) throw new ErroDeUso("Perfil inválido.");
   if (b.senha && String(b.senha).length < 6) throw new ErroDeUso("A senha precisa de pelo menos 6 caracteres.");
-  if (!id && !b.senha) throw new ErroDeUso("Defina uma senha inicial.");
+  // Acesso novo sem senha informada recebe a senha padrão.
+  const senhaNova = b.senha ? String(b.senha) : id ? "" : config.SENHA_PADRAO;
 
   const usuario = await transacao(async (c) => {
     const dup = await c.query("SELECT 1 FROM usuarios WHERE email = $1 AND id <> COALESCE($2, '')", [email, id]);
@@ -315,8 +318,8 @@ async function salvarUsuario(req, res) {
       ]);
       linha = r.rows[0];
     }
-    if (b.senha) {
-      const r = await c.query("UPDATE usuarios SET senha_hash = $2, trocar_senha = $3 WHERE id = $1 RETURNING *", [linha.id, await gerarHash(b.senha), Boolean(b.trocarSenha)]);
+    if (senhaNova) {
+      const r = await c.query("UPDATE usuarios SET senha_hash = $2, trocar_senha = $3 WHERE id = $1 RETURNING *", [linha.id, await gerarHash(senhaNova), Boolean(b.trocarSenha)]);
       linha = r.rows[0];
     }
     if (!linha.ativo) await c.query("DELETE FROM sessoes WHERE usuario_id = $1", [linha.id]);
@@ -334,6 +337,16 @@ async function salvarUsuario(req, res) {
 
 rotas.post("/usuarios", auth.exigir("admin"), assincrono(salvarUsuario));
 rotas.put("/usuarios/:id", auth.exigir("admin"), assincrono(salvarUsuario));
+
+// Volta a senha de um acesso para a senha padrão. Por padrão pede uma senha nova no próximo acesso.
+rotas.post("/usuarios/:id/resetar-senha", auth.exigir("admin"), assincrono(async (req, res) => {
+  const { rows } = await pool.query("UPDATE usuarios SET senha_hash = $2, trocar_senha = $3 WHERE id = $1 RETURNING *", [
+    req.params.id, await gerarHash(config.SENHA_PADRAO), req.body?.trocarSenha !== false,
+  ]);
+  if (!rows.length) throw new ErroDeUso("Usuário não encontrado.", 404);
+  avisarTodos();
+  res.json({ usuario: usuarioPublico(rows[0]) });
+}));
 
 // Exclui um acesso. Os lançamentos e eventos que ele registrou continuam (o nome do autor fica
 // guardado no lançamento); a equipe de um coordenador excluído fica sem coordenador.
@@ -392,13 +405,12 @@ rotas.put("/pessoas/:id", auth.exigir("admin", "rh"), assincrono(salvarPessoa));
 // ---------- Importação da equipe por planilha (Colaboradores) ----------
 // Recebe as linhas já lidas da planilha (o navegador lê o .xlsx) e devolve o que vai mudar.
 // Com "aplicar: false" só simula (prévia); com "aplicar: true" grava tudo numa transação.
-// Regras: estagiários ficam de fora; coordenador ganha login de Coordenador (criado com senha
-// provisória quando o e-mail ainda não tem login); quem já está cadastrado é achado pelo nome
+// Regras: estagiários ficam de fora; coordenador ganha login de Coordenador (criado com a senha
+// padrão quando o e-mail ainda não tem login); quem já está cadastrado é achado pelo nome
 // (o nome cadastrado não muda); quem não está na planilha pode ficar inativo.
 const semAcento = (v) => String(v ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
 const nomeProprio = (n) =>
   String(n).toLowerCase().replace(/(^|\s)(\S)/g, (m, e, l) => e + l.toUpperCase()).replace(/\s(Da|De|Do|Das|Dos|E)\s/g, (m) => m.toLowerCase());
-const senhaProvisoria = () => crypto.randomBytes(6).toString("base64").replace(/[+/=]/g, "x").slice(0, 8);
 
 function categoriaDaLinha(l) {
   const cargo = semAcento(l.cargo);
@@ -484,7 +496,7 @@ async function importarEquipe(req, res) {
         u = { id: aplicar ? uid("u") : `novo:${it.email}`, nome: nomeProprio(it.nome), email: it.email, perfil: "lider", ativo: true };
         r.loginsNovos.push({ nome: u.nome, email: u.email });
         if (aplicar) {
-          const senha = senhaProvisoria();
+          const senha = config.SENHA_PADRAO;
           await c.query("INSERT INTO usuarios (id, nome, email, perfil, senha_hash, trocar_senha) VALUES ($1, $2, $3, 'lider', $4, TRUE)", [u.id, u.nome, u.email, await gerarHash(senha)]);
           r.senhas.push({ nome: u.nome, email: u.email, senha });
         }

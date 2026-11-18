@@ -64,7 +64,7 @@
       estado = await api("publico");
     }
     eu = estado.eu || null;
-    db = { usuarios: estado.usuarios || [], coordenadores: estado.coordenadores || [], modeloAvaliacao: estado.modeloAvaliacao || null, pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], ciclos: estado.ciclos || null, atualizadoEm: estado.atualizadoEm };
+    db = { usuarios: estado.usuarios || [], senhaPadrao: estado.senhaPadrao || "", coordenadores: estado.coordenadores || [], modeloAvaliacao: estado.modeloAvaliacao || null, pessoas: estado.pessoas || [], lancamentos: estado.lancamentos || [], atividades: estado.atividades || [], ciclos: estado.ciclos || null, atualizadoEm: estado.atualizadoEm };
     return db;
   }
 
@@ -241,6 +241,16 @@
   async function removerFoto(id) {
     await api(`pessoas/${encodeURIComponent(id)}/foto`, { metodo: "DELETE" });
     await aposEscrita();
+  }
+
+  // Volta a senha do acesso para a senha padrão.
+  async function resetarSenha(id, trocarSenha = false) {
+    await api(`usuarios/${encodeURIComponent(id)}/resetar-senha`, { metodo: "POST", corpo: { trocarSenha } });
+    await aposEscrita();
+  }
+
+  function senhaPadrao() {
+    return db?.senhaPadrao || "";
   }
 
   async function excluirUsuario(id) {
@@ -468,6 +478,8 @@
     importarEquipe,
     excluirPessoa,
     excluirUsuario,
+    resetarSenha,
+    senhaPadrao,
     fotoUrl,
     prepararFoto,
     salvarFoto,

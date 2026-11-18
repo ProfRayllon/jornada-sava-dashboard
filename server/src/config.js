@@ -16,4 +16,7 @@ module.exports = {
   // Primeiro acesso: criado só quando o banco ainda não tem nenhum usuário.
   ADMIN_EMAIL: (env.ADMIN_EMAIL || "admin@sava.adv.br").trim().toLowerCase(),
   ADMIN_SENHA: env.ADMIN_PASSWORD || "",
+  // Senha padrão dos acessos criados pelo administrador (coordenadores etc.) e do botão
+  // "Resetar senha". Provisória, até existir a recuperação de senha por e-mail.
+  SENHA_PADRAO: env.DEFAULT_USER_PASSWORD || "@senha123",
 };

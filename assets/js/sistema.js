@@ -2338,7 +2338,7 @@
           <ul class="muted small">
             <li>Quem já está cadastrado é reconhecido pelo nome; quem não está é criado.</li>
             <li>Com OAB ou cargo de associado: Advogados Associados. Demais (CLT etc.): Controladoria e Administrativo.</li>
-            <li>PERFIL_EQUIPE = COORDENADOR ganha login de Coordenador (senha provisória) e passa a avaliar a equipe.</li>
+            <li>PERFIL_EQUIPE = COORDENADOR ganha login de Coordenador (senha padrão) e passa a avaliar a equipe.</li>
             <li>Estagiários ficam de fora da Jornada.</li>
           </ul>
         </div>
@@ -2420,8 +2420,8 @@
       "Equipe importada",
       `${r.senhas.length
         ? `<div class="imp-senhas">
-            <p><b>Logins de Coordenador criados.</b> Anote ou copie agora: as senhas provisórias não aparecem de novo. No primeiro acesso, o sistema pede a troca.</p>
-            <table class="table"><thead><tr><th>Coordenador</th><th>E-mail</th><th>Senha provisória</th></tr></thead><tbody>
+            <p><b>Logins de Coordenador criados</b> com a senha padrão. No primeiro acesso, o sistema pede a troca.</p>
+            <table class="table"><thead><tr><th>Coordenador</th><th>E-mail</th><th>Senha</th></tr></thead><tbody>
               ${r.senhas.map((s) => `<tr><td>${esc(s.nome)}</td><td>${esc(s.email)}</td><td><code>${esc(s.senha)}</code></td></tr>`).join("")}
             </tbody></table>
             <button class="btn btn-ghost btn-sm" type="button" id="impCopiar">Copiar logins e senhas</button>
@@ -2557,6 +2557,27 @@
     return null;
   }
 
+  function resetarSenha(u) {
+    if (!u) return;
+    abrirModal(
+      "Resetar senha",
+      `<form class="form-grid" id="resetForm" novalidate>
+        <p class="field-full">A senha de <b>${esc(u.nome)}</b> (${esc(u.email)}) volta a ser a senha padrão <code>${esc(S.senhaPadrao())}</code>.</p>
+        <label class="check-line field-full"><input type="checkbox" name="trocarSenha" checked /> Pedir troca de senha no próximo acesso</label>
+        <p class="form-error field-full" id="rsErro"></p>
+        <div class="form-actions field-full"><button class="btn btn-ghost" type="button" data-close>Cancelar</button><button class="btn btn-gold" type="submit">Resetar senha</button></div>
+      </form>`,
+    );
+    $("#resetForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const trocar = new FormData(e.target).get("trocarSenha") === "on";
+      const r = await executar(() => S.resetarSenha(u.id, trocar), { carregando: "Resetando senha…", concluido: "Senha resetada", detalhe: esc(u.nome) });
+      if (!r.ok) return ($("#rsErro").textContent = r.erro.message);
+      fecharModal();
+      render();
+    });
+  }
+
   async function excluirUsuario(u) {
     if (!u) return;
     const equipe = avaliadosDe(u) || [];
@@ -2623,15 +2644,17 @@
                   })()}</td>
                   <td>${esc(u.area || "—")}</td>
                   <td><span class="status ${u.ativo ? "on" : ""}">${u.ativo ? "Ativo" : "Bloqueado"}</span></td>
-                  <td><div class="row-actions">${btnEditar("data-editar", u.id)}${u.id === state.usuario.id ? "" : btnExcluir("data-excluir-usuario", u.id)}</div></td>
+                  <td><div class="row-actions">${btnIcone("senha", "Resetar senha", "data-resetar-senha", u.id)}${btnEditar("data-editar", u.id)}${u.id === state.usuario.id ? "" : btnExcluir("data-excluir-usuario", u.id)}</div></td>
                 </tr>`,
                 )
                 .join("")}
             </tbody>
           </table>
         </div>
+        ${S.senhaPadrao() ? `<p class="equipe-rodape">${ico("senha")}<span>Senha padrão dos coordenadores (acesso novo ou senha resetada): <code>${esc(S.senhaPadrao())}</code>. No primeiro acesso com ela, o sistema pede uma senha nova. Esqueceu a senha? Use o botão de chave para resetar.</span></p>` : ""}
       </div>`;
     $("#novoUsuario", el).addEventListener("click", () => formUsuario());
+    $$("[data-resetar-senha]", el).forEach((b) => b.addEventListener("click", () => resetarSenha(lista.find((u) => u.id === b.dataset.resetarSenha))));
     $$("[data-excluir-usuario]", el).forEach((b) => b.addEventListener("click", () => excluirUsuario(lista.find((u) => u.id === b.dataset.excluirUsuario))));
     $$("[data-avaliados]", el).forEach((b) => b.addEventListener("click", () => abrirAvaliadosDe(lista.find((u) => u.id === b.dataset.avaliados))));
     $$("[data-editar]", el).forEach((b) => b.addEventListener("click", () => formUsuario(lista.find((u) => u.id === b.dataset.editar))));
@@ -2645,7 +2668,7 @@
         <label class="field"><span>E-mail</span><input type="email" name="email" required value="${esc(u.email || "")}" /></label>
         <label class="field"><span>Perfil</span><select name="perfil">${Object.entries(perfis).map(([id, p]) => `<option value="${id}" ${u.perfil === id ? "selected" : ""}>${p.nome}</option>`).join("")}</select></label>
         <label class="field"><span>Área / equipe</span><input name="area" value="${esc(u.area || "")}" placeholder="Ex.: Trabalhista" /></label>
-        <label class="field field-full"><span>${u.id ? "Nova senha (deixe em branco para manter)" : "Senha inicial"}</span><input type="text" name="senha" minlength="6" autocomplete="new-password" /></label>
+        <label class="field field-full"><span>${u.id ? "Nova senha (deixe em branco para manter)" : "Senha inicial (em branco = senha padrão)"}</span><input type="text" name="senha" minlength="6" autocomplete="new-password" placeholder="${u.id ? "" : esc(S.senhaPadrao())}" /></label>
         <label class="check-line field-full"><input type="checkbox" name="trocarSenha" checked /> Pedir troca de senha no próximo acesso</label>
         ${u.id ? `<label class="check-line field-full"><input type="checkbox" name="ativo" ${u.ativo ? "checked" : ""} /> Acesso ativo</label>` : ""}
         <p class="form-error field-full" id="ufErro"></p>
